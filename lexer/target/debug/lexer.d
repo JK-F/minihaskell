@@ -1,0 +1,1 @@
+/home/myo/coding/mini-haskell/lexer/target/debug/lexer: /home/myo/coding/mini-haskell/lexer/src/CFG.pest /home/myo/coding/mini-haskell/lexer/src/Fib.hs /home/myo/coding/mini-haskell/lexer/src/ast.rs /home/myo/coding/mini-haskell/lexer/src/main.rs

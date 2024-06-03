@@ -1,0 +1,34 @@
+// Whitespace
+WHITESPACE = _{ " " }
+newline    = _{ "\n" }
+// Program:
+program    = _{ SOI ~ (decl ~ newline)+ ~ newline? ~ EOI }
+decl       = _{ func_decl | type_decl | type_alias | "" }
+type_alias =  { "type" ~ type_name ~ "=" ~ token_type }
+type_decl  =  { var_name ~ "::" ~ token_type }
+func_decl  =  { var_name ~ patterns ~ "=" ~ expr }
+patterns   =  { (var_name | literal)* }
+// Expressions:
+expr        = _{ infixop | aexpr }
+aexpr       = _{ application | paren_expr | tuple_expr | cond | literal | var_name }
+infixop     =  { aexpr ~ binop ~ expr }
+application =  { var_name ~ expr+ }
+paren_expr  =  { "(" ~ expr ~ ")" }
+tuple_expr  =  { "(" ~ expr ~ ("," ~ expr)+ ~ ")" }
+cond        =  { "if" ~ expr ~ "then" ~ expr ~ "else" ~ expr }
+binop       = @{ "+" | "-" | "*" | "/" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&" | "||" }
+token_type  = _{ func_type | atype }
+atype       = _{ paren_type | tuple_type | type_name }
+func_type   =  { atype ~ "->" ~ atype }
+paren_type  =  { "(" ~ token_type ~ ")" }
+tuple_type  =  { "(" ~ token_type ~ ("," ~ token_type)+ ~ ")" }
+// Literals
+literal = _{ number | char | bool | string }
+number  = @{ ASCII_DIGIT+ }
+char    = @{ "'" ~ !("'" | "\\") ~ ANY ~ "'" }
+bool    = @{ "true" | "false" }
+string  = @{ "\"" ~ ( !("\"" | "\\") ~ ASCII)* ~ "\"" }
+
+
+type_name = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
+var_name  = @{ ASCII_ALPHA_LOWER ~ ASCII_ALPHANUMERIC* }
