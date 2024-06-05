@@ -16,6 +16,7 @@ macro_rules! test_parse {
     $(
         #[test]
         fn $name(){
+            let _ = env_logger::try_init();
             let src = include_str!($file);
             info!("Reading file: {:?}", $file);
             let ast = parse(src);

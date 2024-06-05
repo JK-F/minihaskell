@@ -2,7 +2,6 @@ use log::info;
 use parser::parse;
 use parser::test_parse;
 
-
 test_parse!{
     var: "files/var.hs",
     fun: "files/fun.hs",
@@ -11,3 +10,4 @@ test_parse!{
     tuples: "files/tuples.hs",
     ifthenelse: "files/ifthen.hs",
 }
+
