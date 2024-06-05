@@ -5,7 +5,7 @@ macro_rules! info_parse {
             "Parsing {} {:?}: {:?}",
             $name,
             $pair.as_rule(),
-            $pair.as_rule()
+            $pair.as_str()
         );
     };
 }

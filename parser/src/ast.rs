@@ -5,6 +5,7 @@ pub enum AstNode<'a> {
     TypeAlias(DebrujinIndex, Type<'a>),
     TypeSignature(DebrujinIndex, Type<'a>),
     Decl(DebrujinIndex, Vec<Pattern<'a>>, Expr<'a>),
+    EndOfInstruction,
 }
 
 #[derive(Debug)]
