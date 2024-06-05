@@ -1,16 +1,16 @@
-pub type Program<'a> = Vec<AstNode<'a>>;
+type DebrujinIndex = usize;
 
 #[derive(Debug)]
 pub enum AstNode<'a> {
-    TypeAlias(&'a str, Type<'a>),
-    TypeSignature(&'a str, Type<'a>),
-    Decl(&'a str, Vec<Pattern<'a>>, Expr<'a>),
+    TypeAlias(DebrujinIndex, Type<'a>),
+    TypeSignature(DebrujinIndex, Type<'a>),
+    Decl(DebrujinIndex, Vec<Pattern<'a>>, Expr<'a>),
 }
 
 #[derive(Debug)]
 pub enum Pattern<'a> {
     Literal(Literal<'a>),
-    Var(&'a str),
+    Var(DebrujinIndex),
 }
 
 #[derive(Debug)]
@@ -22,14 +22,13 @@ pub enum Type<'a> {
 
 #[derive(Debug)]
 pub enum Expr<'a> {
-    Var(&'a str),
-    Application(&'a str, Vec<Expr<'a>>),
+    Var(DebrujinIndex),
+    Application(DebrujinIndex, Vec<Expr<'a>>),
     Literal(Literal<'a>),
     Tuple(Vec<Expr<'a>>),
     If(Box<Expr<'a>>, Box<Expr<'a>>, Box<Expr<'a>>),
     BinOp(Box<Expr<'a>>, Op, Box<Expr<'a>>),
 }
-
 #[derive(Debug)]
 pub enum Literal<'a> {
     Int(i64),
