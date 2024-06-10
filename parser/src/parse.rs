@@ -39,9 +39,8 @@ fn parse_decl<'a>(
         Rule::type_alias => {
             let mut inner = decl.into_inner();
             let var = parse_symname(inner.next().ok_or(GrammarError)?)?;
-            debrujin.push(var);
             let typ = parse_type(inner.next().ok_or(GrammarError)?)?;
-            Ok(AstNode::TypeAlias(0, typ))
+            Ok(AstNode::TypeAlias(var, typ))
         }
         Rule::func_decl => {
             let mut inner = decl.into_inner();
