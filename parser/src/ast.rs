@@ -1,44 +1,79 @@
+use core::fmt;
+
 type DebrujinIndex = usize;
 
-#[derive(Debug)]
-pub enum AstNode<'a> {
-    TypeAlias(&'a str, Type<'a>),
-    TypeSignature(DebrujinIndex, Type<'a>),
-    Decl(DebrujinIndex, Vec<Pattern<'a>>, Expr<'a>),
+#[derive(Debug, Clone)]
+pub enum AstNode {
+    TypeAlias(String, Type),
+    TypeSignature(String, Type),
+    Decl(String, Expr),
+    SExpr(Expr),
     EndOfInstruction,
 }
 
-#[derive(Debug)]
-pub enum Pattern<'a> {
-    Literal(Literal<'a>),
-    Var(DebrujinIndex),
+#[derive(Debug, Clone)]
+pub enum Pattern {
+    Value(Value),
+    Var,
 }
 
-#[derive(Debug)]
-pub enum Type<'a> {
-    TypeName(&'a str),
-    Function(Box<Type<'a>>, Box<Type<'a>>),
-    Tuple(Vec<Type<'a>>),
+#[derive(Debug, Clone)]
+pub enum Type {
+    TypeName(String),
+    Function(Box<Type>, Box<Type>),
+    Tuple(Vec<Type>),
 }
 
-#[derive(Debug)]
-pub enum Expr<'a> {
-    Var(DebrujinIndex),
-    Application(DebrujinIndex, Vec<Expr<'a>>),
-    Literal(Literal<'a>),
-    Tuple(Vec<Expr<'a>>),
-    If(Box<Expr<'a>>, Box<Expr<'a>>, Box<Expr<'a>>),
-    BinOp(Box<Expr<'a>>, Op, Box<Expr<'a>>),
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Type::TypeName(name) => write!(f, "{}", name),
+            Type::Function(left, right) => write!(f, "{} -> {}", left, right),
+            Type::Tuple(vals) => {
+                write!(f, "(")?;
+                for val in vals{
+                    write!(f, "{},", val)?;
+                }
+                write!(f, ")")?;
+                Ok(())
+            }
+        }
+    }
 }
-#[derive(Debug)]
-pub enum Literal<'a> {
+
+#[derive(Debug, Clone)]
+pub enum Expr {
+    Symbol(String),
+    Var(DebrujinIndex),
+    Application(Box<Expr>, Box<Expr>),
+    Value(Value),
+    Tuple(Vec<Expr>),
+    If(Box<Expr>, Box<Expr>, Box<Expr>),
+    BinOp(Box<Expr>, Op, Box<Expr>),
+}
+#[derive(Debug, Clone)]
+pub enum Value {
     Int(i64),
     Bool(bool),
     Char(char),
-    String(&'a str),
+    String(String),
+    Function(Box<Pattern>, Box<Expr>)
 }
 
-#[derive(Debug)]
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::Int(l), Value::Int(r)) => l == r,
+            (Value::Bool(l), Value::Bool(r)) => l == r,
+            (Value::Char(l), Value::Char(r)) => l == r,
+            (Value::String(l), Value::String(r)) => l == r,
+            _ => false,
+        }
+    }   
+    
+}
+
+#[derive(Debug, Clone)]
 pub enum Op {
     Add,
     Sub,

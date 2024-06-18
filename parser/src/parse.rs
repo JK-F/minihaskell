@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, Expr, Literal, Op, Pattern, Type};
+use crate::ast::{AstNode, Expr, Value, Op, Pattern, Type};
 use crate::error::ParsingError;
 use crate::error::ParsingError::GrammarError;
 use crate::info_parse;
@@ -12,29 +12,26 @@ use std::collections::VecDeque;
 #[grammar = "./CFG.pest"]
 struct LexicalHaskell;
 
-pub fn build_ast(source: &str) -> Result<VecDeque<AstNode>, ParsingError> {
-    let pairs = LexicalHaskell::parse(Rule::program, source)?;
+pub fn build_ast(source: String) -> Result<VecDeque<AstNode>, ParsingError> {
+    let pairs = LexicalHaskell::parse(Rule::program, &source)?;
     info!("Found {} decls", pairs.len());
-    let mut debrujin: Vec<&str> = vec![];
-    let res = pairs
-        .map(|p| parse_decl(p, &mut debrujin))
-        .flatten()
-        .collect();
+    let mut res = VecDeque::new();
+    for pair in pairs {
+        res.push_back(parse_decl(pair)?);
+    }
     Ok(res)
 }
 
-fn parse_decl<'a>(
-    decl: Pair<'a, Rule>,
-    debrujin: &mut Vec<&'a str>,
-) -> Result<AstNode<'a>, ParsingError<'a>> {
-    info_parse!("Declaration", &decl);
+fn parse_decl(
+    decl: Pair<Rule>,
+) -> Result<AstNode, ParsingError> {
+    info_parse!("Declaration", decl);
     let res = match decl.as_rule() {
         Rule::type_decl => {
             let mut inner = decl.into_inner();
             let var = parse_symname(inner.next().ok_or(GrammarError)?)?;
-            debrujin.push(var);
             let typ = parse_type(inner.next().ok_or(GrammarError)?)?;
-            Ok(AstNode::TypeSignature(0, typ))
+            Ok(AstNode::TypeSignature(var, typ))
         }
         Rule::type_alias => {
             let mut inner = decl.into_inner();
@@ -45,32 +42,29 @@ fn parse_decl<'a>(
         Rule::func_decl => {
             let mut inner = decl.into_inner();
             let var = parse_symname(inner.next().ok_or(GrammarError)?)?;
-            debrujin.push(var);
-            let patterns = parse_patterns(inner.next().ok_or(GrammarError)?, debrujin)?;
-            let expr = parse_expr(inner.next().ok_or(GrammarError)?, debrujin)?;
-            let count = patterns
-                .iter()
-                .filter(|pattern| matches!(pattern, Pattern::Var(_)))
-                .count();
-            (0..count).for_each(|_| {
-                debrujin.pop();
-            }); // For variable names
-            debrujin.pop(); // For function name
-            Ok(AstNode::Decl(0, patterns, expr))
+            let patterns = parse_patterns(inner.next().ok_or(GrammarError)?, &mut vec![])?;
+            let expr = parse_expr(inner.next().ok_or(GrammarError)?, &mut vec![])?;
+            let fun = patterns.into_iter()
+                .fold(expr, |exp, pattern| { Expr::Value(Value::Function(Box::new(pattern), Box::new(exp)))});
+
+            Ok(AstNode::Decl(var, fun))
+        }
+        Rule::expr => {
+            let mut inner = decl.into_inner();
+            let expr = parse_expr(inner.next().ok_or(GrammarError)? , &mut vec![])?;
+            Ok(AstNode::SExpr(expr))
         }
         Rule::EOI => Ok(AstNode::EndOfInstruction),
-        _ => Err(GrammarError),
-    };
+        _ => Err(GrammarError), };
     info!("Returning {:?}", &res);
     res
 }
-
-fn parse_expr<'a>(
-    expr: Pair<'a, Rule>,
-    debrujin: &mut Vec<&'a str>,
-) -> Result<Expr<'a>, ParsingError<'a>> {
-    info_parse!("Expression", &expr);
-    return match expr.as_rule() {
+fn parse_expr(
+    expr: Pair<Rule>,
+    debrujin: &mut Vec<String>,
+) -> Result<Expr, ParsingError> {
+    info_parse!("Expression", expr);
+    let expr = match expr.as_rule() {
         Rule::infixop => {
             let mut inner = expr.into_inner();
             let e1 = parse_expr(inner.next().ok_or(GrammarError)?, debrujin)?;
@@ -81,14 +75,12 @@ fn parse_expr<'a>(
         Rule::application => {
             let mut inner = expr.into_inner();
             let func_name = parse_symname(inner.next().ok_or(GrammarError)?)?;
-            info!("Debrujin: {:?}, variable: {:?}", debrujin, func_name);
-            let index = debrujin
-                .iter()
-                .rev()
-                .position(|v| v.eq(&func_name))
-                .ok_or(ParsingError::UnknownSymbol(func_name))?;
-            let args = inner.map(|p| parse_expr(p, debrujin)).flatten().collect();
-            Ok(Expr::Application(index, args))
+            let args = inner.map(|p| parse_expr(p, debrujin)).flatten();
+            let var = Box::new(Expr::Symbol(func_name));
+            let expr: Expr = *args.fold(var, |exp, arg| {
+                Box::new(Expr::Application(exp, Box::new(arg)))
+            });
+            Ok(expr)
         }
         Rule::paren_expr => {
             let mut inner = expr.into_inner();
@@ -96,7 +88,7 @@ fn parse_expr<'a>(
             Ok(e)
         }
         Rule::number | Rule::char | Rule::bool | Rule::string => {
-            parse_literal(expr).map(Expr::Literal)
+            parse_literal(expr).map(Expr::Value)
         }
         Rule::var_name => {
             let var = parse_symname(expr)?;
@@ -104,8 +96,8 @@ fn parse_expr<'a>(
                 .iter()
                 .rev()
                 .position(|v| v.eq(&var))
-                .ok_or(ParsingError::UnknownSymbol(var))?;
-            Ok(Expr::Var(index))
+                .map_or(Expr::Symbol(var), |idx| Expr::Var(idx));
+            Ok(index)
         }
         Rule::tuple_expr => {
             let inner = expr.into_inner();
@@ -114,19 +106,20 @@ fn parse_expr<'a>(
         }
         Rule::cond => {
             let inner = expr.into_inner();
-            let mut es = inner.map(|e| parse_expr(e, debrujin)).flatten();
-            return Ok(Expr::If(
-                Box::new(es.nth(0).ok_or(GrammarError)?),
-                Box::new(es.nth(1).ok_or(GrammarError)?),
-                Box::new(es.nth(2).ok_or(GrammarError)?),
-            ));
+            let mut es: Vec<Expr> = inner.map(|e| parse_expr(e, debrujin)).flatten().collect();
+            Ok(Expr::If(
+                Box::new(es.pop().ok_or(GrammarError)?),
+                Box::new(es.pop().ok_or(GrammarError)?),
+                Box::new(es.pop().ok_or(GrammarError)?),
+            ))
         }
         _ => Err(GrammarError),
     };
+    return expr;
 }
 
 fn parse_binop(infixop: Pair<Rule>) -> Result<Op, ParsingError> {
-    info_parse!("Binary Operation", &infixop);
+    info_parse!("Binary Operation", infixop);
     return match infixop.as_str() {
         "+" => Ok(Op::Add),
         "-" => Ok(Op::Sub),
@@ -144,11 +137,11 @@ fn parse_binop(infixop: Pair<Rule>) -> Result<Op, ParsingError> {
     };
 }
 
-fn parse_patterns<'a>(
-    patterns: Pair<'a, Rule>,
-    debrujin: &mut Vec<&'a str>,
-) -> Result<Vec<Pattern<'a>>, ParsingError<'a>> {
-    info_parse!("Patterns", &patterns);
+fn parse_patterns(
+    patterns: Pair<Rule>,
+    debrujin: &mut Vec<String>,
+) -> Result<Vec<Pattern>, ParsingError> {
+    info_parse!("Patterns", patterns);
     let inner = patterns.into_inner();
     let pats = inner
         .map(|pattern| parse_pattern(pattern, debrujin))
@@ -157,55 +150,57 @@ fn parse_patterns<'a>(
     Ok(pats)
 }
 
-fn parse_pattern<'a>(
-    pattern: Pair<'a, Rule>,
-    debrujin: &mut Vec<&'a str>,
-) -> Result<Pattern<'a>, ParsingError<'a>> {
-    info_parse!("Pattern", &pattern);
+fn parse_pattern(
+    pattern: Pair<Rule>,
+    debrujin: &mut Vec<String>,
+) -> Result<Pattern, ParsingError> {
+    info_parse!("Pattern", pattern);
     return match pattern.as_rule() {
         Rule::number | Rule::char | Rule::bool | Rule::string => {
-            Ok(Pattern::Literal(parse_literal(pattern)?))
+            debrujin.push(String::new()); // Push for alignment
+            Ok(Pattern::Value(parse_literal(pattern)?))
         }
         Rule::var_name => {
             let var = parse_symname(pattern)?;
             debrujin.push(var);
-            Ok(Pattern::Var(0))
+            Ok(Pattern::Var)
         }
         _ => Err(GrammarError),
     };
 }
 
-fn parse_literal<'a>(literal: Pair<'a, Rule>) -> Result<Literal<'a>, ParsingError<'a>> {
-    info_parse!("Literal", &literal);
+fn parse_literal(literal: Pair<Rule>) -> Result<Value, ParsingError> {
+    info_parse!("Literal", literal);
     return match literal.as_rule() {
         Rule::number => {
             let num = literal.as_str();
             if let Ok(val) = num.parse() {
-                return Ok(Literal::Int(val));
+                return Ok(Value::Int(val));
             }
             Err(GrammarError)
         }
         Rule::char => {
             let char = literal.as_str().chars().nth(1).ok_or(GrammarError)?;
-            Ok(Literal::Char(char))
+            Ok(Value::Char(char))
         }
         Rule::bool => {
             let boolean = literal.as_str();
             if let Ok(val) = boolean.parse() {
-                return Ok(Literal::Bool(val));
+                return Ok(Value::Bool(val));
             }
             Err(GrammarError)
         }
         Rule::string => {
-            let mut inner = literal.into_inner();
-            Ok(Literal::String(inner.next().ok_or(GrammarError)?.as_str()))
+            let s = literal.as_str();
+            let s = &s[1..s.len() - 1]; // Remove '"'
+            Ok(Value::String(s.to_string()))
         }
         _ => Err(GrammarError),
     };
 }
 
 fn parse_type(atype: Pair<Rule>) -> Result<Type, ParsingError> {
-    info_parse!("Type", &atype);
+    info_parse!("Type", atype);
     return match atype.as_rule() {
         Rule::type_name => parse_symname(atype).map(|x| Type::TypeName(x)),
         Rule::func_type => {
@@ -228,8 +223,8 @@ fn parse_type(atype: Pair<Rule>) -> Result<Type, ParsingError> {
     };
 }
 
-fn parse_symname(name: Pair<Rule>) -> Result<&str, ParsingError> {
-    info_parse!("Symbol name", &name);
+fn parse_symname(name: Pair<Rule>) -> Result<String, ParsingError> {
+    info_parse!("Symbol name", name);
     let name = name.as_str();
-    return Ok(name);
+    return Ok(name.to_string());
 }

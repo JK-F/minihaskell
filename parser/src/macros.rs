@@ -4,8 +4,8 @@ macro_rules! info_parse {
         info!(
             "Parsing {} {:?}: {:?}",
             $name,
-            $pair.as_rule(),
-            $pair.as_str()
+            &$pair.as_rule(),
+            &$pair.as_str()
         );
     };
 }
@@ -20,6 +20,9 @@ macro_rules! test_parse {
             let src = include_str!($file);
             info!("Reading file: {:?}", $file);
             let ast = parse(src);
+            if ast.is_err() {
+                info!("{:?}", ast);
+            }
             assert!(ast.is_ok());
             let ast = ast.unwrap();
             for decl in ast {
