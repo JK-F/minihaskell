@@ -1,7 +1,9 @@
 use std::collections::{HashMap, VecDeque};
 
+
 use parser::ast::AstNode::{Decl, EndOfInstruction, SExpr, TypeAlias, TypeSignature};
-use parser::ast::Expr::*;
+use parser::ast::Expr::{Symbol, Var, Application, Tuple, If, BinOp};
+use parser::ast::Op::{Add, Sub, Mul, Div, Eq, Neq, Lt, Gt, Le, Ge, And, Or};
 use parser::ast::{AstNode, Expr, Type, Value};
 
 use crate::error::RunTimeError;
@@ -22,9 +24,6 @@ impl Environment {
     fn store(&mut self, var: String, e: Expr) {
         self.map.insert(var, (vec![], e));
     }
-    fn store_curried(&mut self, var: String, args: Vec<Expr>, e: Expr) {
-        self.map.insert(var, (args, e));
-    }
 
     fn get(&mut self, var: &String) -> Option<(Vec<Expr>, Expr)> {
         self.map.get(var).map(|c| c.clone())
@@ -41,8 +40,11 @@ impl Iterator for Interpreter {
                 TypeSignature(_, _) => Some(()),
                 Decl(var, e) => Some(self.env.store(var, e)),
                 SExpr(e) => {
-                    let res = self.eval_expr(e, &mut vec![]);
-                    print!("{:?}", res);
+                    let res = self.eval_expr(e.clone(), &mut vec![]);
+                    match res {
+                        Ok(val) => println!("> {}", val),
+                        Err(err) => println!("Error at while running: {}", err),
+                    }
                     Some(())
                 }
                 EndOfInstruction => None,
@@ -62,7 +64,10 @@ impl Interpreter {
 
     fn eval_expr(&mut self, expr: Expr, stack: &mut Vec<Expr>) -> Result<Value, RunTimeError> {
         match expr {
-            Value(v) => Ok(v),
+            Expr::Value(Value::Function(_args, expr)) => {
+                self.eval_expr(*expr, stack)
+            },
+            Expr::Value(v) => Ok(v),
             Symbol(name) => {
                 let (mut args, expr) = self.env.get(&name).ok_or(RunTimeError::SymbolNotFound(name))?;
                 let mut new_stack = stack.clone();
@@ -70,13 +75,13 @@ impl Interpreter {
                 self.eval_expr(expr, &mut new_stack)
             },
             Var(d) => {
-                let pos = stack.len() - d;
+                let pos = stack.len() - 1 - d;
                 let e = stack[pos].clone();
                 let val = self.eval_expr(e, &mut vec![])?;
                 let _ = std::mem::replace(&mut stack[pos], Expr::Value(val.clone()));
                 Ok(val)
             }
-            Tuple(vals) => {
+            Tuple(_vals) => {
                 todo!()
             }
             If(test, ethen, eelse) => {
@@ -87,62 +92,62 @@ impl Interpreter {
                 return self.eval_expr(*eelse, stack);
             }
             BinOp(l, op, r) => match op {
-                parser::ast::Op::Add => {
+                Add => {
                     let lv = self.eval_int(l, stack)?;
                     let rv = self.eval_int(r, stack)?;
                     Ok(Value::Int(lv + rv))
                 }
-                parser::ast::Op::Sub => {
+                Sub => {
                     let lv = self.eval_int(l, stack)?;
                     let rv = self.eval_int(r, stack)?;
                     Ok(Value::Int(lv - rv))
                 }
-                parser::ast::Op::Mul => {
+                Mul => {
                     let lv = self.eval_int(l, stack)?;
                     let rv = self.eval_int(r, stack)?;
                     Ok(Value::Int(lv * rv))
                 }
-                parser::ast::Op::Div => {
+                Div => {
                     let lv = self.eval_int(l, stack)?;
                     let rv = self.eval_int(r, stack)?;
                     Ok(Value::Int(lv / rv))
                 }
-                parser::ast::Op::Eq => {
+                Eq => {
                     let lv = self.eval_expr(*l, stack)?;
                     let rv = self.eval_expr(*r, stack)?;
                     Ok(Value::Bool(lv == rv))
                 }
-                parser::ast::Op::Neq => {
+                Neq => {
                     let lv = self.eval_expr(*l, stack)?;
                     let rv = self.eval_expr(*r, stack)?;
                     Ok(Value::Bool(lv != rv))
                 }
-                parser::ast::Op::Lt => {
+                Lt => {
                     let lv = self.eval_int(l, stack)?;
                     let rv = self.eval_int(r, stack)?;
                     Ok(Value::Bool(lv < rv))
                 }
-                parser::ast::Op::Gt => {
+                Gt => {
                     let lv = self.eval_int(l, stack)?;
                     let rv = self.eval_int(r, stack)?;
                     Ok(Value::Bool(lv > rv))
                 }
-                parser::ast::Op::Le => {
+                Le => {
                     let lv = self.eval_int(l, stack)?;
                     let rv = self.eval_int(r, stack)?;
                     Ok(Value::Bool(lv <= rv))
                 }
-                parser::ast::Op::Ge => {
+                Ge => {
                     let lv = self.eval_int(l, stack)?;
                     let rv = self.eval_int(r, stack)?;
                     Ok(Value::Bool(lv >= rv))
                 }
-                parser::ast::Op::And => {
+                And => {
                     let lv = self.eval_bool(l, stack)?;
                     let rv = self.eval_bool(r, stack)?;
                     Ok(Value::Bool(lv && rv))
                 }
-                parser::ast::Op::Or => {
+                Or => {
                     let lv = self.eval_bool(l, stack)?;
                     let rv = self.eval_bool(r, stack)?;
                     Ok(Value::Bool(lv || rv))
@@ -155,8 +160,8 @@ impl Interpreter {
         }
     }
 
-    fn eval_int(&mut self, l: Box<Expr>, stack: &mut Vec<Expr>) -> Result<i64, RunTimeError> {
-        return match self.eval_expr(*l, stack)? {
+    fn eval_int(&mut self, expr: Box<Expr>, stack: &mut Vec<Expr>) -> Result<i64, RunTimeError> {
+        return match self.eval_expr(*expr, stack)? {
             Value::Int(v) => Ok(v),
             _ => Err(RunTimeError::TypeError(
                 Type::TypeName("Int".to_string()),
@@ -164,8 +169,8 @@ impl Interpreter {
             )),
         };
     }
-    fn eval_bool(&mut self, l: Box<Expr>, stack: &mut Vec<Expr>) -> Result<bool, RunTimeError> {
-        return match self.eval_expr(*l, stack)? {
+    fn eval_bool(&mut self, expr: Box<Expr>, stack: &mut Vec<Expr>) -> Result<bool, RunTimeError> {
+        return match self.eval_expr(*expr, stack)? {
             Value::Bool(v) => Ok(v),
             _ => Err(RunTimeError::TypeError(
                 Type::TypeName("Bool".to_string()),

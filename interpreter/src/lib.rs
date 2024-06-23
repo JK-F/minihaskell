@@ -7,7 +7,7 @@ pub(crate) mod interpreter;
 
 pub fn interpret(program: VecDeque<AstNode>) {
     let interpreter = Interpreter::new(program);
-    for unit in interpreter {
-        print!("Executed line!")
+    for _ in interpreter {
     }
+    println!("");
 }
