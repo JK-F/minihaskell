@@ -31,7 +31,7 @@ impl fmt::Display for Type {
             Type::Function(left, right) => write!(f, "{} -> {}", left, right),
             Type::Tuple(vals) => {
                 write!(f, "(")?;
-                for val in vals{
+                for val in vals {
                     write!(f, "{},", val)?;
                 }
                 write!(f, ")")?;
@@ -57,7 +57,7 @@ pub enum Value {
     Bool(bool),
     Char(char),
     String(String),
-    Function(Box<Pattern>, Box<Expr>)
+    Function(Box<Pattern>, Box<Expr>),
 }
 
 impl PartialEq for Value {
@@ -69,8 +69,19 @@ impl PartialEq for Value {
             (Value::String(l), Value::String(r)) => l == r,
             _ => false,
         }
-    }   
-    
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Int(val) => write!(f, "{}", val),
+            Value::Bool(val) => write!(f, "{}", val),
+            Value::Char(val) => write!(f, "{}", val),
+            Value::String(val) => write!(f, "{}", val),
+            Value::Function(_, _) => write!(f, "Function"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

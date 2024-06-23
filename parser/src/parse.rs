@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, Expr, Value, Op, Pattern, Type};
+use crate::ast::{AstNode, Expr, Op, Pattern, Type, Value};
 use crate::error::ParsingError;
 use crate::error::ParsingError::GrammarError;
 use crate::info_parse;
@@ -22,9 +22,7 @@ pub fn build_ast(source: String) -> Result<VecDeque<AstNode>, ParsingError> {
     Ok(res)
 }
 
-fn parse_decl(
-    decl: Pair<Rule>,
-) -> Result<AstNode, ParsingError> {
+fn parse_decl(decl: Pair<Rule>) -> Result<AstNode, ParsingError> {
     info_parse!("Declaration", decl);
     let res = match decl.as_rule() {
         Rule::type_decl => {
@@ -42,27 +40,36 @@ fn parse_decl(
         Rule::func_decl => {
             let mut inner = decl.into_inner();
             let var = parse_symname(inner.next().ok_or(GrammarError)?)?;
-            let patterns = parse_patterns(inner.next().ok_or(GrammarError)?, &mut vec![])?;
-            let expr = parse_expr(inner.next().ok_or(GrammarError)?, &mut vec![])?;
-            let fun = patterns.into_iter()
-                .fold(expr, |exp, pattern| { Expr::Value(Value::Function(Box::new(pattern), Box::new(exp)))});
+            let mut debrujin = vec![];
+            let patterns = parse_patterns(inner.next().ok_or(GrammarError)?, &mut debrujin)?;
+            let expr = parse_expr(inner.next().ok_or(GrammarError)?, &mut debrujin)?;
+            let fun = patterns.into_iter().fold(expr, |exp, pattern| {
+                Expr::Value(Value::Function(Box::new(pattern), Box::new(exp)))
+            });
 
             Ok(AstNode::Decl(var, fun))
         }
-        Rule::expr => {
-            let mut inner = decl.into_inner();
-            let expr = parse_expr(inner.next().ok_or(GrammarError)? , &mut vec![])?;
+        Rule::infixop
+        | Rule::number
+        | Rule::char
+        | Rule::bool
+        | Rule::string
+        | Rule::aexpr
+        | Rule::application
+        | Rule::paren_expr
+        | Rule::tuple_expr
+        | Rule::cond
+        | Rule::var_name => {
+            let expr = parse_expr(decl, &mut vec![])?;
             Ok(AstNode::SExpr(expr))
         }
         Rule::EOI => Ok(AstNode::EndOfInstruction),
-        _ => Err(GrammarError), };
+        _ => Err(GrammarError),
+    };
     info!("Returning {:?}", &res);
     res
 }
-fn parse_expr(
-    expr: Pair<Rule>,
-    debrujin: &mut Vec<String>,
-) -> Result<Expr, ParsingError> {
+fn parse_expr(expr: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Expr, ParsingError> {
     info_parse!("Expression", expr);
     let expr = match expr.as_rule() {
         Rule::infixop => {
@@ -150,10 +157,7 @@ fn parse_patterns(
     Ok(pats)
 }
 
-fn parse_pattern(
-    pattern: Pair<Rule>,
-    debrujin: &mut Vec<String>,
-) -> Result<Pattern, ParsingError> {
+fn parse_pattern(pattern: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Pattern, ParsingError> {
     info_parse!("Pattern", pattern);
     return match pattern.as_rule() {
         Rule::number | Rule::char | Rule::bool | Rule::string => {

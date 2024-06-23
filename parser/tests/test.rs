@@ -11,4 +11,7 @@ test_parse! {
     ifthenelse: "files/ifthen.hs",
     application: "files/appl.hs",
     fib: "files/fib.hs",
+    just_exp: "files/just_exp.hs",
+    appl_exp: "files/appl_exp.hs",
+    tmp: "../../tmp/src/test.hs",
 }
