@@ -114,10 +114,13 @@ fn parse_expr(expr: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Expr, Pars
         Rule::cond => {
             let inner = expr.into_inner();
             let mut es: Vec<Expr> = inner.map(|e| parse_expr(e, debrujin)).flatten().collect();
+            let else_expr = Box::new(es.pop().ok_or(GrammarError)?);
+            let then_expr = Box::new(es.pop().ok_or(GrammarError)?);
+            let test = Box::new(es.pop().ok_or(GrammarError)?);
             Ok(Expr::If(
-                Box::new(es.pop().ok_or(GrammarError)?),
-                Box::new(es.pop().ok_or(GrammarError)?),
-                Box::new(es.pop().ok_or(GrammarError)?),
+                test,
+                then_expr,
+                else_expr,
             ))
         }
         _ => Err(GrammarError),
