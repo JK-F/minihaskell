@@ -63,6 +63,7 @@ impl Interpreter {
     }
 
     fn eval_expr(&mut self, expr: Expr, stack: &mut Vec<Expr>) -> Result<Value, RunTimeError> {
+        println!("Interpreting expression: {:?}, stack:{:?}", expr, stack);
         match expr {
             Expr::Value(Value::Function(_args, expr)) => {
                 self.eval_expr(*expr, stack)
@@ -77,7 +78,7 @@ impl Interpreter {
             Var(d) => {
                 let pos = stack.len() - 1 - d;
                 let e = stack[pos].clone();
-                let val = self.eval_expr(e, &mut vec![])?;
+                let val = self.eval_expr(e, stack)?;
                 let _ = std::mem::replace(&mut stack[pos], Expr::Value(val.clone()));
                 Ok(val)
             }
