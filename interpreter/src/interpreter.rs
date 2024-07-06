@@ -1,6 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
 
+use log::info;
 use parser::ast::AstNode::{Decl, EndOfInstruction, SExpr, TypeAlias, TypeSignature};
 use parser::ast::Expr::{Symbol, Var, Application, Tuple, If, BinOp};
 use parser::ast::Op::{Add, Sub, Mul, Div, Eq, Neq, Lt, Gt, Le, Ge, And, Or};
@@ -63,7 +64,7 @@ impl Interpreter {
     }
 
     fn eval_expr(&mut self, expr: Expr, stack: &mut Vec<Expr>) -> Result<Value, RunTimeError> {
-        println!("Interpreting expression: {:?}, stack:{:?}", expr, stack);
+        info!("Interpreting expression: {:?}, stack:{:?}", expr, stack);
         match expr {
             Expr::Value(Value::Function(_args, expr)) => {
                 self.eval_expr(*expr, stack)
