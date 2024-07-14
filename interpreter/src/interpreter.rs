@@ -55,6 +55,8 @@ impl Iterator for Interpreter {
     }
 }
 
+type Stack = Vec<(Expr, usize)>;
+
 impl Interpreter {
     pub fn new(program: VecDeque<AstNode>) -> Interpreter {
         Interpreter {
@@ -63,7 +65,7 @@ impl Interpreter {
         }
     }
 
-    fn eval_expr(&mut self, expr: Expr, stack: &mut Vec<Expr>) -> Result<Value, RunTimeError> {
+    fn eval_expr(&mut self, expr: Expr, stack: &mut Stack) -> Result<Value, RunTimeError> {
         info!("Interpreting expression: {:?}, stack:{:?}", expr, stack);
         match expr {
             Expr::Value(Value::Function(_args, expr)) => {
@@ -73,14 +75,17 @@ impl Interpreter {
             Symbol(name) => {
                 let (mut args, expr) = self.env.get(&name).ok_or(RunTimeError::SymbolNotFound(name))?;
                 let mut new_stack = stack.clone();
-                new_stack.append(&mut args);
+                let appended_at = new_stack.len();
+                for arg in args {
+                    new_stack.push((arg, appended_at));
+                }
                 self.eval_expr(expr, &mut new_stack)
             },
             Var(d) => {
                 let pos = stack.len() - 1 - d;
-                let e = stack[pos].clone();
-                let val = self.eval_expr(e, stack)?;
-                let _ = std::mem::replace(&mut stack[pos], Expr::Value(val.clone()));
+                let (e, eval_size) = stack[pos].clone();
+                let val = self.eval_expr(e, &mut stack[0..eval_size].to_vec())?;
+                let _ = std::mem::replace(&mut stack[pos], (Expr::Value(val.clone()), pos));
                 Ok(val)
             }
             Tuple(_vals) => {
@@ -156,13 +161,13 @@ impl Interpreter {
                 }
             },
             Application(f, e) => {
-                stack.push(*e);
+                stack.push((*e, stack.len()));
                 self.eval_expr(*f, stack)
             },
         }
     }
 
-    fn eval_int(&mut self, expr: Box<Expr>, stack: &mut Vec<Expr>) -> Result<i64, RunTimeError> {
+    fn eval_int(&mut self, expr: Box<Expr>, stack: &mut Stack) -> Result<i64, RunTimeError> {
         return match self.eval_expr(*expr, stack)? {
             Value::Int(v) => Ok(v),
             _ => Err(RunTimeError::TypeError(
@@ -171,7 +176,7 @@ impl Interpreter {
             )),
         };
     }
-    fn eval_bool(&mut self, expr: Box<Expr>, stack: &mut Vec<Expr>) -> Result<bool, RunTimeError> {
+    fn eval_bool(&mut self, expr: Box<Expr>, stack: &mut Stack) -> Result<bool, RunTimeError> {
         return match self.eval_expr(*expr, stack)? {
             Value::Bool(v) => Ok(v),
             _ => Err(RunTimeError::TypeError(
