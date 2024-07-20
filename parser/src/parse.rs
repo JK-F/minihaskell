@@ -234,10 +234,11 @@ fn parse_literal(literal: Pair<Rule>) -> Result<Value, ParsingError> {
         }
         Rule::bool => {
             let boolean = literal.as_str();
-            if let Ok(val) = boolean.parse() {
-                return Ok(Value::Bool(val));
+            match boolean {
+                "True" => Ok(Value::Bool(true)),
+                "False" => Ok(Value::Bool(false)),
+                _ => Err(GrammarError)
             }
-            Err(GrammarError)
         }
         Rule::string => {
             let s = literal.as_str();

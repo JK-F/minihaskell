@@ -26,7 +26,7 @@ tuple_type  =  { "(" ~ token_type ~ ("," ~ token_type)+ ~ ")" }
 literal = _{ number | char | bool | string }
 number  = @{ ASCII_DIGIT+ }
 char    = @{ "'" ~ !("'" | "\\") ~ ANY ~ "'" }
-bool    = @{ "true" | "false" }
+bool    = @{ "True" | "False" }
 string  = @{ "\"" ~ (!("\"" | "\\") ~ ASCII)* ~ "\"" }
 
 type_name = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
