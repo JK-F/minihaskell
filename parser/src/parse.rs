@@ -6,20 +6,19 @@ use log::info;
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
-use std::collections::VecDeque;
 
 #[derive(Parser)]
 #[grammar = "./CFG.pest"]
 struct LexicalHaskell;
 
-pub fn build_ast(source: String) -> Result<VecDeque<AstNode>, ParsingError> {
+pub fn build_ast(source: String) -> Result<Vec<AstNode>, ParsingError> {
     let pairs = LexicalHaskell::parse(Rule::program, &source)?;
     info!("Found {} decls", pairs.len());
-    let mut res = VecDeque::new();
+    let mut ast = vec![];
     for pair in pairs {
-        res.push_back(parse_decl(pair)?);
+        ast.push(parse_decl(pair)?);
     }
-    Ok(res)
+    Ok(ast)
 }
 
 fn parse_decl(decl: Pair<Rule>) -> Result<AstNode, ParsingError> {
@@ -39,15 +38,29 @@ fn parse_decl(decl: Pair<Rule>) -> Result<AstNode, ParsingError> {
         }
         Rule::func_decl => {
             let mut inner = decl.into_inner();
-            let var = parse_symname(inner.next().ok_or(GrammarError)?)?;
-            let mut debrujin = vec![];
-            let patterns = parse_patterns(inner.next().ok_or(GrammarError)?, &mut debrujin)?;
-            let expr = parse_expr(inner.next().ok_or(GrammarError)?, &mut debrujin)?;
-            let fun = patterns.into_iter().fold(expr, |exp, pattern| {
-                Expr::Value(Value::Function(Box::new(pattern), Box::new(exp)))
-            });
+            // We knwo that there must be a symname next based on the rule being a func_decl
+            let fun_name = parse_symname(inner.next().ok_or(GrammarError)?)?;
+            let mut fun_rhs = vec![];
 
-            Ok(AstNode::Decl(var, fun))
+            while inner.peek().is_some() {
+                let mut debrujin = vec![];
+                let patterns = parse_patterns(inner.next().ok_or(GrammarError)?, &mut debrujin)?;
+                let expr = parse_expr(inner.next().ok_or(GrammarError)?, &mut debrujin)?;
+
+                if !patterns.is_empty() {
+                    merge_decls(fun_name.clone(), &mut fun_rhs, patterns, expr)?;
+                } else if inner.peek().is_none() {
+                    return Ok(AstNode::Decl(fun_name, Expr::Value(Value::ConstantFunction(Box::new(expr)))));
+                } else {
+                    // There are no patterns for this function declaratation ==> This is a constant
+                    // There is more function declarations within this inner ==> There are multiple
+                    // definitions of a constant
+                    return Err(ParsingError::MultipleDefinitions(fun_name));
+                }
+
+            }
+
+            Ok(AstNode::Decl(fun_name, Expr::Value(Value::Function(fun_rhs))))
         }
         Rule::infixop
         | Rule::number
@@ -69,6 +82,33 @@ fn parse_decl(decl: Pair<Rule>) -> Result<AstNode, ParsingError> {
     info!("Returning {:?}", &res);
     res
 }
+
+fn merge_decls(fun_name: String, fun_rhs: &mut Vec<(Pattern, Expr)>, patterns: Vec<Pattern>, expr: Expr) -> Result<(), ParsingError> {
+    assert!(patterns.len() > 0);
+    let mut patterns = patterns;
+    let pattern = patterns.remove(0);
+    let x = fun_rhs.iter_mut().find(|(p, _)| p.eq(&pattern));
+    return match x {
+        Some((_, Expr::Value(Value::Function(inner_vec)))) => {
+            if patterns.len() <= 1 {
+                return Err(ParsingError::VaryingArity(fun_name));
+            }
+            merge_decls(fun_name, inner_vec, patterns, expr)
+        }
+        Some((_, _)) => {
+            if patterns.len() > 1 {
+                return Err(ParsingError::VaryingArity(fun_name));
+            }
+            fun_rhs.push((pattern, expr));
+            Ok(())
+        }
+        None => {
+            fun_rhs.push((pattern, expr));
+            Ok(())
+        },
+    };
+}
+
 fn parse_expr(expr: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Expr, ParsingError> {
     info_parse!("Expression", expr);
     let expr = match expr.as_rule() {
@@ -153,10 +193,12 @@ fn parse_patterns(
 ) -> Result<Vec<Pattern>, ParsingError> {
     info_parse!("Patterns", patterns);
     let inner = patterns.into_inner();
+    info!("Im here 1");
     let pats = inner
         .map(|pattern| parse_pattern(pattern, debrujin))
         .flatten()
         .collect();
+    info!("Im here 2");
     Ok(pats)
 }
 
@@ -209,7 +251,16 @@ fn parse_literal(literal: Pair<Rule>) -> Result<Value, ParsingError> {
 fn parse_type(atype: Pair<Rule>) -> Result<Type, ParsingError> {
     info_parse!("Type", atype);
     return match atype.as_rule() {
-        Rule::type_name => parse_symname(atype).map(|x| Type::TypeName(x)),
+        Rule::type_name => {
+            let name = parse_symname(atype)?;
+            Ok(match name.as_str() {
+                "Int" => Type::Int,
+                "Bool" => Type::Bool,
+                "Char" => Type::Char,
+                "String" => Type::String,
+                _ => Type::TypeName(name)
+            })
+        },
         Rule::func_type => {
             let mut inner = atype.into_inner();
             let t1 = parse_type(inner.next().ok_or(GrammarError)?)?;

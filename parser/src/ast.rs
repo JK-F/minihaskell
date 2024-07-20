@@ -11,17 +11,21 @@ pub enum AstNode {
     EndOfInstruction,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
     Value(Value),
     Var,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     TypeName(String),
     Function(Box<Type>, Box<Type>),
     Tuple(Vec<Type>),
+    Int,
+    Bool,
+    Char,
+    String
 }
 
 impl fmt::Display for Type {
@@ -37,6 +41,10 @@ impl fmt::Display for Type {
                 write!(f, ")")?;
                 Ok(())
             }
+            Type::Int => write!(f, "Int"),
+            Type::Bool => write!(f, "Bool"),
+            Type::Char => write!(f, "Char"),
+            Type::String => write!(f, "String")
         }
     }
 }
@@ -57,7 +65,8 @@ pub enum Value {
     Bool(bool),
     Char(char),
     String(String),
-    Function(Box<Pattern>, Box<Expr>),
+    Function(Vec<(Pattern, Expr)>),
+    ConstantFunction(Box<Expr>)
 }
 
 impl PartialEq for Value {
@@ -79,7 +88,8 @@ impl fmt::Display for Value {
             Value::Bool(val) => write!(f, "{}", val),
             Value::Char(val) => write!(f, "{}", val),
             Value::String(val) => write!(f, "{}", val),
-            Value::Function(_, _) => write!(f, "Function"),
+            Value::ConstantFunction(_) => write!(f, "Constant"),
+            Value::Function(_) => write!(f, "Function"),
         }
     }
 }

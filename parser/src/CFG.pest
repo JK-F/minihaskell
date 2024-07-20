@@ -6,7 +6,7 @@ program    = _{ SOI ~ (decl ~ newline)+ ~ newline? ~ EOI }
 decl       = _{ func_decl | type_decl | type_alias | expr | "" }
 type_alias =  { "type" ~ type_name ~ "=" ~ token_type }
 type_decl  =  { var_name ~ "::" ~ token_type }
-func_decl  =  { var_name ~ patterns ~ "=" ~ expr }
+func_decl  =  { PUSH(var_name) ~ patterns ~ "=" ~ expr ~ (newline ~ PEEK ~ patterns ~ "=" ~ expr)* }
 patterns   =  { (var_name | literal)* }
 // Expressions:
 expr        = _{ infixop | aexpr }
@@ -27,8 +27,7 @@ literal = _{ number | char | bool | string }
 number  = @{ ASCII_DIGIT+ }
 char    = @{ "'" ~ !("'" | "\\") ~ ANY ~ "'" }
 bool    = @{ "true" | "false" }
-string  = @{ "\"" ~ ( !("\"" | "\\") ~ ASCII)* ~ "\"" }
-
+string  = @{ "\"" ~ (!("\"" | "\\") ~ ASCII)* ~ "\"" }
 
 type_name = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
 var_name  = @{ !reserved ~ ASCII_ALPHA_LOWER ~ ASCII_ALPHANUMERIC* }
