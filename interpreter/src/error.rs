@@ -11,4 +11,6 @@ pub enum RunTimeError {
     TypeError(Type, Type),
     #[error("Reached end of program")]
     EndOfProgram,
+    #[error("Found non Exhaustive pattern in function")]
+    NonExhaustivePattern,
 }
