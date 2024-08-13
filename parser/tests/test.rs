@@ -4,7 +4,7 @@ use parser::test_parse;
 
 test_parse! {
     var: "files/var.hs",
-    fun: "files/fun.hs",
+    simple_fun: "files/simple_fun.hs",
     complex_fun: "files/complex_fun.hs",
     literals: "files/literals.hs",
     tuples: "files/tuples.hs",
@@ -13,5 +13,4 @@ test_parse! {
     fib: "files/fib.hs",
     just_exp: "files/just_exp.hs",
     appl_exp: "files/appl_exp.hs",
-    tmp: "../../tmp/src/test.hs",
 }

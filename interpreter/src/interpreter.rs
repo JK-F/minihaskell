@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 
-
 use log::info;
 use parser::ast::AstNode::{Decl, EndOfInstruction, SExpr, TypeAlias, TypeSignature};
-use parser::ast::Expr::{Symbol, Var, Application, Tuple, If, BinOp};
-use parser::ast::Op::{Add, Sub, Mul, Div, Eq, Neq, Lt, Gt, Le, Ge, And, Or};
-use parser::ast::{AstNode, Expr, Type, Value};
+use parser::ast::Expr::{Application, BinOp, If, Symbol, Tuple, Var};
+use parser::ast::Op::{Add, And, Div, Eq, Ge, Gt, Le, Lt, Mul, Neq, Or, Sub};
+use parser::ast::{AstNode, Expr, Pattern, Type, Value};
 
 use crate::error::RunTimeError;
 
@@ -15,12 +14,14 @@ pub struct Interpreter {
 }
 
 struct Environment {
-    map: HashMap<String, Expr>
+    map: HashMap<String, Expr>,
 }
 
 impl Environment {
     fn new() -> Environment {
-        return Environment { map: HashMap::new() };
+        return Environment {
+            map: HashMap::new(),
+        };
     }
     fn store(&mut self, var: String, e: Expr) {
         self.map.insert(var, e);
@@ -67,24 +68,23 @@ impl Interpreter {
 
     fn eval_expr(&mut self, expr: Expr, stack: &mut Stack) -> Result<Value, RunTimeError> {
         info!("Interpreting with current stack {:?}", stack);
-//        if stack.len() > 10 {
-//            panic!("yeah fuck");
-//        }
+        //        if stack.len() > 10 {
+        //            panic!("yeah fuck");
+        //        }
         match expr {
-            Expr::Value(Value::ConstantFunction(e)) => {
-                info!("Interpreting constant {:?}", e);
-                self.eval_expr(*e, stack)
-            },
             Expr::Value(v) => {
                 info!("Interpreting Value {:?}", v);
                 Ok(v)
-            },
+            }
             Symbol(name) => {
                 info!("Interpreting function of name {name}");
-                let expr = self.env.get(&name).ok_or(RunTimeError::SymbolNotFound(name))?;
+                let expr = self
+                    .env
+                    .get(&name)
+                    .ok_or(RunTimeError::SymbolNotFound(name))?;
                 let mut new_stack = stack.clone();
                 self.eval_expr(expr, &mut new_stack)
-            },
+            }
             Var(d) => {
                 info!("Interpreting variable #{d}");
                 let pos = stack.len() - 1 - d;
@@ -97,15 +97,17 @@ impl Interpreter {
                 todo!()
             }
             If(test, ethen, eelse) => {
-                info!("Interpreting if {:?} then {:?} else {:?} ", test, ethen, eelse);
+                info!(
+                    "Interpreting if {:?} then {:?} else {:?} ",
+                    test, ethen, eelse
+                );
                 let tv = self.eval_bool(test, stack)?;
                 if tv {
                     return self.eval_expr(*ethen, stack);
                 }
                 return self.eval_expr(*eelse, stack);
             }
-            BinOp(l, op, r) => 
-            {
+            BinOp(l, op, r) => {
                 info!("interpreting {:?} {:?} {:?}", l, op, r);
                 return match op {
                     Add => {
@@ -168,18 +170,19 @@ impl Interpreter {
                         let rv = self.eval_bool(r, stack)?;
                         Ok(Value::Bool(lv || rv))
                     }
-                }
-            },
+                };
+            }
             Application(f, e) => {
                 info!("Application of {:?} to {:?}", f, e);
-                let fun = self.eval_expr(*f, stack)?;
-                let arg = self.eval_expr(*e, stack)?;
-                let expr = find_match(fun, &arg)?;
-                stack.push((Expr::Value(arg), stack.len()));
-                let res = self.eval_expr(expr, stack);
+                stack.push((*e, stack.len()));
+                let fun = self.eval_expr(*f, stack);
                 stack.pop();
-                res
-            },
+                fun
+            }
+            Expr::Case(e, cases) => {
+                let body = self.find_match(stack, *e, &cases[..])?;
+                self.eval_expr(body.clone(), stack)
+            }
         }
     }
 
@@ -201,32 +204,35 @@ impl Interpreter {
             )),
         };
     }
-}
 
-fn find_match(fun: Value, arg: &Value) -> Result<Expr, RunTimeError> {
-    return match fun {
-        Value::Function(v) => {
-            let (p, e) = v.iter().find(|(p, _)| pattern_matches(arg, p)).ok_or(RunTimeError::NonExhaustivePattern)?;
-            info!("Choosing pattern {:?} for arg {:?}", p, arg);
-            Ok(e.clone())
-        },
-        _ => Err(RunTimeError::TypeError(
-            Type::TypeName("Function".to_string()),
-            Type::TypeName("Later".to_string())
-            )
-        )
+    fn find_match<'a>(
+        &mut self,
+        stack: &mut Stack,
+        e: Expr,
+        cases: &'a [(Pattern, Expr)],
+    ) -> Result<&'a Expr, RunTimeError> {
+        if let [(p, body)] = cases {
+            if matches!(p, Pattern::Var) {
+                return Ok(body);
+            }
+        }
+        let v = self.eval_expr(e, stack)?;
+        for (pattern, body) in cases {
+            if matches(&v, pattern) {
+                return Ok(body);
+            }
+        }
+        Err(RunTimeError::NonExhaustivePattern)
     }
 }
 
-fn pattern_matches(arg: &Value, p: &parser::ast::Pattern) -> bool {
+fn matches(arg: &Value, p: &Pattern) -> bool {
     match (arg, p) {
         (Value::Int(i1), parser::ast::Pattern::Value(Value::Int(i2))) => i1 == i2,
         (Value::Bool(b1), parser::ast::Pattern::Value(Value::Bool(b2))) => b1 == b2,
         (Value::Char(c1), parser::ast::Pattern::Value(Value::Char(c2))) => c1 == c2,
         (Value::String(s1), parser::ast::Pattern::Value(Value::String(s2))) => s1 == s2,
         (_, parser::ast::Pattern::Var) => true,
-        _ => false
+        _ => false,
     }
 }
-
-

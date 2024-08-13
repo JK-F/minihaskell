@@ -1,7 +1,5 @@
 use core::fmt;
 
-type DebrujinIndex = usize;
-
 #[derive(Debug, Clone)]
 pub enum AstNode {
     TypeAlias(String, Type),
@@ -49,24 +47,35 @@ impl fmt::Display for Type {
     }
 }
 
+type DebrujinIndex = usize;
 #[derive(Debug, Clone)]
 pub enum Expr {
     Symbol(String),
     Var(DebrujinIndex),
     Application(Box<Expr>, Box<Expr>),
     Value(Value),
-    Tuple(Vec<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
+    Case(Box<Expr>, Vec<(Pattern, Expr)>),
     BinOp(Box<Expr>, Op, Box<Expr>),
+    Tuple(Vec<Expr>),
+    List(List)
 }
+
 #[derive(Debug, Clone)]
 pub enum Value {
     Int(i64),
     Bool(bool),
     Char(char),
+    Tuple(Vec<Value>),
     String(String),
-    Function(Vec<(Pattern, Expr)>),
-    ConstantFunction(Box<Expr>)
+    Function0(Box<Expr>),
+    Function1(Box<Expr>),
+}
+
+#[derive(Debug, Clone)]
+pub enum List {
+    Concat(Box<Expr>, Box<List>),
+    Empty
 }
 
 impl PartialEq for Value {
@@ -87,9 +96,10 @@ impl fmt::Display for Value {
             Value::Int(val) => write!(f, "{}", val),
             Value::Bool(val) => write!(f, "{}", val),
             Value::Char(val) => write!(f, "{}", val),
+            Value::Tuple(vs) => vs.into_iter().map(|v| write!(f, "{}", v)).collect(),
             Value::String(val) => write!(f, "{}", val),
-            Value::ConstantFunction(_) => write!(f, "Constant"),
-            Value::Function(_) => write!(f, "Function"),
+            Value::Function0(_) => write!(f, "fun[]"),
+            Value::Function1(_) => write!(f, "fun[#0]"),
         }
     }
 }

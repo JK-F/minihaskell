@@ -15,6 +15,7 @@ infixop     =  { aexpr ~ binop ~ expr }
 application =  { var_name ~ expr+ }
 paren_expr  =  { "(" ~ expr ~ ")" }
 tuple_expr  =  { "(" ~ expr ~ ("," ~ expr)+ ~ ")" }
+list_expr   =  { "(" ~ expr ~ ("," ~ expr)+ ~ ")" }
 cond        =  { "if" ~ expr ~ "then" ~ expr ~ "else" ~ expr }
 binop       = @{ "+" | "-" | "*" | "/" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&" | "||" }
 token_type  = _{ func_type | atype }

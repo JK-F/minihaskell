@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, Expr, Op, Pattern, Type, Value};
+use crate::ast::{AstNode, Expr, List, Op, Pattern, Type, Value};
 use crate::error::ParsingError;
 use crate::error::ParsingError::GrammarError;
 use crate::info_parse;
@@ -8,7 +8,7 @@ use pest::Parser;
 use pest_derive::Parser;
 
 #[derive(Parser)]
-#[grammar = "./CFG.pest"]
+#[grammar = "./grammar.pest"]
 struct LexicalHaskell;
 
 pub fn build_ast(source: String) -> Result<Vec<AstNode>, ParsingError> {
@@ -40,27 +40,16 @@ fn parse_decl(decl: Pair<Rule>) -> Result<AstNode, ParsingError> {
             let mut inner = decl.into_inner();
             // We knwo that there must be a symname next based on the rule being a func_decl
             let fun_name = parse_symname(inner.next().ok_or(GrammarError)?)?;
-            let mut fun_rhs = vec![];
+            let mut cases = vec![];
 
             while inner.peek().is_some() {
                 let mut debrujin = vec![];
                 let patterns = parse_patterns(inner.next().ok_or(GrammarError)?, &mut debrujin)?;
                 let expr = parse_expr(inner.next().ok_or(GrammarError)?, &mut debrujin)?;
-
-                if !patterns.is_empty() {
-                    merge_decls(fun_name.clone(), &mut fun_rhs, patterns, expr)?;
-                } else if inner.peek().is_none() {
-                    return Ok(AstNode::Decl(fun_name, Expr::Value(Value::ConstantFunction(Box::new(expr)))));
-                } else {
-                    // There are no patterns for this function declaratation ==> This is a constant
-                    // There is more function declarations within this inner ==> There are multiple
-                    // definitions of a constant
-                    return Err(ParsingError::MultipleDefinitions(fun_name));
-                }
-
+                cases.push(nested_cases(&patterns, expr, 0));
             }
-
-            Ok(AstNode::Decl(fun_name, Expr::Value(Value::Function(fun_rhs))))
+            let fun_rhs = merged_cases(cases, &fun_name)?;
+            Ok(AstNode::Decl(fun_name, fun_rhs))
         }
         Rule::infixop
         | Rule::number
@@ -71,6 +60,7 @@ fn parse_decl(decl: Pair<Rule>) -> Result<AstNode, ParsingError> {
         | Rule::application
         | Rule::paren_expr
         | Rule::tuple_expr
+        | Rule::list_expr
         | Rule::cond
         | Rule::var_name => {
             let expr = parse_expr(decl, &mut vec![])?;
@@ -83,31 +73,42 @@ fn parse_decl(decl: Pair<Rule>) -> Result<AstNode, ParsingError> {
     res
 }
 
-fn merge_decls(fun_name: String, fun_rhs: &mut Vec<(Pattern, Expr)>, patterns: Vec<Pattern>, expr: Expr) -> Result<(), ParsingError> {
-    assert!(patterns.len() > 0);
-    let mut patterns = patterns;
-    let pattern = patterns.remove(0);
-    let x = fun_rhs.iter_mut().find(|(p, _)| p.eq(&pattern));
-    return match x {
-        Some((_, Expr::Value(Value::Function(inner_vec)))) => {
-            if patterns.len() <= 1 {
-                return Err(ParsingError::VaryingArity(fun_name));
+fn merged_cases(es: Vec<Expr>, fun_name: &String) -> Result<Expr, ParsingError> {
+    let mut depth = Box::new(Expr::Var(0));
+    let mut v: Vec<(Pattern, Vec<Expr>)> = vec![];
+    if es.len() == 1 {
+        return Ok(es.first().unwrap().clone());
+    }
+    for case in es {
+        match case {
+            Expr::Case(i, cs) => {
+                depth = i;
+                for (p, e) in cs {
+                    match v.iter_mut().find(|(p2, _)| p.eq(p2)) {
+                        Some((_, es)) => es.push(e),
+                        None => v.push((p, vec![e])),
+                    };
+                }
+
             }
-            merge_decls(fun_name, inner_vec, patterns, expr)
-        }
-        Some((_, _)) => {
-            if patterns.len() > 1 {
-                return Err(ParsingError::VaryingArity(fun_name));
-            }
-            fun_rhs.push((pattern, expr));
-            Ok(())
-        }
-        None => {
-            fun_rhs.push((pattern, expr));
-            Ok(())
-        },
-    };
+            _ => {return Err(ParsingError::MultipleDefinitions(fun_name.clone()))}
+        };
+    }
+    let mut cases = vec![];
+    for (p, bodies) in v {
+        cases.push((p, merged_cases(bodies, fun_name)?));
+    }
+    return Ok(Expr::Case(depth, cases));
 }
+
+fn nested_cases(ps: &[Pattern], expr: Expr, depth: usize) -> Expr {
+    match ps {
+        [] => expr,
+        [p, ps @ ..] => Expr::Case(Box::new(Expr::Var(depth)), vec![(p.clone(), nested_cases(ps, expr, depth+1))])
+
+    }
+}
+
 
 fn parse_expr(expr: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Expr, ParsingError> {
     info_parse!("Expression", expr);
@@ -150,6 +151,12 @@ fn parse_expr(expr: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Expr, Pars
             let inner = expr.into_inner();
             let es: Vec<Expr> = inner.map(|p| parse_expr(p, debrujin)).flatten().collect();
             Ok(Expr::Tuple(es))
+        }
+        Rule::list_expr => {
+            let inner = expr.into_inner();
+            let es: Vec<Expr> = inner.map(|p| parse_expr(p, debrujin)).flatten().collect();
+            let list = es.into_iter().fold(List::Empty, |acc, e| List::Concat(Box::new(e), Box::new(acc)));
+            Ok(Expr::List(list))
         }
         Rule::cond => {
             let inner = expr.into_inner();

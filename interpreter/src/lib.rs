@@ -1,6 +1,7 @@
 use interpreter::Interpreter;
 use parser::ast::AstNode;
-pub mod error;
+mod error;
+mod env;
 pub(crate) mod interpreter;
 
 pub fn interpret(program: Vec<AstNode>) {
