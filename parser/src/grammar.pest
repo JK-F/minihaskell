@@ -7,15 +7,17 @@ decl       = _{ func_decl | type_decl | type_alias | expr | "" }
 type_alias =  { "type" ~ type_name ~ "=" ~ token_type }
 type_decl  =  { var_name ~ "::" ~ token_type }
 func_decl  =  { PUSH(var_name) ~ patterns ~ "=" ~ expr ~ (newline ~ PEEK ~ patterns ~ "=" ~ expr)* }
-patterns   =  { (var_name | literal)* }
+patterns   =  { pattern* }
+pattern    = _{ var_name | literal | "(" ~ list_pattern ~ ")" }
+list_pattern = { pattern ~ ":" ~ list_pattern | var_name }
 // Expressions:
 expr        = _{ infixop | aexpr }
-aexpr       = _{ application | paren_expr | tuple_expr | cond | literal | var_name }
+aexpr       = _{ application | paren_expr | tuple_expr | cond | literal | var_name | list_expr }
 infixop     =  { aexpr ~ binop ~ expr }
 application =  { var_name ~ expr+ }
 paren_expr  =  { "(" ~ expr ~ ")" }
 tuple_expr  =  { "(" ~ expr ~ ("," ~ expr)+ ~ ")" }
-list_expr   =  { "(" ~ expr ~ ("," ~ expr)+ ~ ")" }
+list_expr   =  { "[" ~ expr ~ ("," ~ expr)+ ~ "]" }
 cond        =  { "if" ~ expr ~ "then" ~ expr ~ "else" ~ expr }
 binop       = @{ "+" | "-" | "*" | "/" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&" | "||" }
 token_type  = _{ func_type | atype }

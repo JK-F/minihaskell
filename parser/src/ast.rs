@@ -13,6 +13,7 @@ pub enum AstNode {
 pub enum Pattern {
     Value(Value),
     Var,
+    List(Box<Pattern>, Box<Pattern>)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -71,10 +72,9 @@ pub enum Value {
     Function0(Box<Expr>),
     Function1(Box<Expr>),
 }
-
 #[derive(Debug, Clone)]
 pub enum List {
-    Concat(Box<Expr>, Box<List>),
+    Some(Box<Expr>, Box<List>),
     Empty
 }
 

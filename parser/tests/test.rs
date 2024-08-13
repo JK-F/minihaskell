@@ -13,4 +13,6 @@ test_parse! {
     fib: "files/fib.hs",
     just_exp: "files/just_exp.hs",
     appl_exp: "files/appl_exp.hs",
+    pattern: "files/pattern.hs",
+    list: "files/list.hs",
 }

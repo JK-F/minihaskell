@@ -155,7 +155,7 @@ fn parse_expr(expr: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Expr, Pars
         Rule::list_expr => {
             let inner = expr.into_inner();
             let es: Vec<Expr> = inner.map(|p| parse_expr(p, debrujin)).flatten().collect();
-            let list = es.into_iter().fold(List::Empty, |acc, e| List::Concat(Box::new(e), Box::new(acc)));
+            let list = es.into_iter().fold(List::Empty, |acc, e| List::Some(Box::new(e), Box::new(acc)));
             Ok(Expr::List(list))
         }
         Rule::cond => {
@@ -200,13 +200,10 @@ fn parse_patterns(
 ) -> Result<Vec<Pattern>, ParsingError> {
     info_parse!("Patterns", patterns);
     let inner = patterns.into_inner();
-    info!("Im here 1");
     let pats = inner
         .map(|pattern| parse_pattern(pattern, debrujin))
-        .flatten()
         .collect();
-    info!("Im here 2");
-    Ok(pats)
+    pats
 }
 
 fn parse_pattern(pattern: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Pattern, ParsingError> {
@@ -220,6 +217,18 @@ fn parse_pattern(pattern: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Patt
             let var = parse_symname(pattern)?;
             debrujin.push(var);
             Ok(Pattern::Var)
+        }
+        Rule::list_pattern => {
+            let mut inner = pattern.into_inner();
+            let len = inner.len();
+            let head = inner.next().ok_or(ParsingError::GrammarError)?;
+            if len == 1 {
+                return parse_pattern(head, debrujin);
+            }
+            let p1 = parse_pattern(head, debrujin)?;
+            let tail = inner.next().ok_or(ParsingError::GrammarError)?;
+            let p2 = parse_pattern(tail, debrujin)?;
+            Ok(Pattern::List(Box::new(p1), Box::new(p2)))
         }
         _ => Err(GrammarError),
     };
