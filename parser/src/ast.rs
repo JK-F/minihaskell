@@ -1,4 +1,5 @@
 use core::fmt;
+use std::io::Empty;
 
 #[derive(Debug, Clone)]
 pub enum AstNode {
@@ -59,7 +60,7 @@ pub enum Expr {
     Case(Box<Expr>, Vec<(Pattern, Expr)>),
     BinOp(Box<Expr>, Op, Box<Expr>),
     Tuple(Vec<Expr>),
-    List(List)
+    List(List<Expr>)
 }
 
 #[derive(Debug, Clone)]
@@ -71,10 +72,11 @@ pub enum Value {
     String(String),
     Function0(Box<Expr>),
     Function1(Box<Expr>),
+    List(List<Value>)
 }
 #[derive(Debug, Clone)]
-pub enum List {
-    Some(Box<Expr>, Box<List>),
+pub enum List<T> {
+    Some(Box<T>, Box<List<T>>),
     Empty
 }
 
@@ -97,6 +99,19 @@ impl fmt::Display for Value {
             Value::Bool(val) => write!(f, "{}", val),
             Value::Char(val) => write!(f, "{}", val),
             Value::Tuple(vs) => vs.into_iter().map(|v| write!(f, "{}", v)).collect(),
+            Value::List(ls) => {
+                let mut vec = vec![];
+                let mut curr = ls;
+                while let List::Some(v, vs) = curr {
+                    vec.push(v);
+                    curr = vs;
+                }
+                write!(f, "[")?;
+                for v in vec {
+                    write!(f, "{}", v)?;
+                }
+                write!(f, "]")
+            },
             Value::String(val) => write!(f, "{}", val),
             Value::Function0(_) => write!(f, "fun[]"),
             Value::Function1(_) => write!(f, "fun[#0]"),
