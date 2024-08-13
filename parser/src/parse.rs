@@ -1,8 +1,4 @@
-use crate::ast::{AstNode, Expr, List, Op, Pattern, Type, Value};
-use crate::error::ParsingError;
-use crate::error::ParsingError::GrammarError;
-use crate::info_parse;
-use log::info;
+use crate::ast::{AstNode, Expr, List, Op, Pattern, Type, Value}; use crate::error::ParsingError; use crate::error::ParsingError::GrammarError; use crate::info_parse; use log::info;
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
@@ -199,6 +195,9 @@ fn parse_patterns(
     debrujin: &mut Vec<String>,
 ) -> Result<Vec<Pattern>, ParsingError> {
     info_parse!("Patterns", patterns);
+    if patterns.as_str() == "[]" {
+        return Ok(vec![Pattern::EmptyList])
+    }
     let inner = patterns.into_inner();
     let pats = inner
         .map(|pattern| parse_pattern(pattern, debrujin))
@@ -207,7 +206,6 @@ fn parse_patterns(
 }
 
 fn parse_pattern(pattern: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Pattern, ParsingError> {
-    info_parse!("Pattern", pattern);
     return match pattern.as_rule() {
         Rule::number | Rule::char | Rule::bool | Rule::string => {
             debrujin.push(String::new()); // Push for alignment

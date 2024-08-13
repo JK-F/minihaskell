@@ -1,5 +1,4 @@
 use core::fmt;
-use std::io::Empty;
 
 #[derive(Debug, Clone)]
 pub enum AstNode {
@@ -14,6 +13,7 @@ pub enum AstNode {
 pub enum Pattern {
     Value(Value),
     Var,
+    EmptyList,
     List(Box<Pattern>, Box<Pattern>)
 }
 
