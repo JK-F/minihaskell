@@ -1,4 +1,4 @@
-use parser::ast::Type;
+use ast::ast::Type;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

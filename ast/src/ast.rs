@@ -1,67 +1,4 @@
-use core::fmt;
-
-#[derive(Debug, Clone)]
-pub enum AstNode {
-    TypeAlias(String, Type),
-    TypeSignature(String, Type),
-    Decl(String, Expr),
-    SExpr(Expr),
-    EndOfInstruction,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Pattern {
-    Value(Value),
-    Var,
-    EmptyList,
-    List(Box<Pattern>, Box<Pattern>),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Type {
-    TypeName(String),
-    Function(Box<Type>, Box<Type>),
-    Tuple(Vec<Type>),
-    Int,
-    Bool,
-    Char,
-    String,
-}
-
-impl fmt::Display for Type {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Type::TypeName(name) => write!(f, "{}", name),
-            Type::Function(left, right) => write!(f, "{} -> {}", left, right),
-            Type::Tuple(vals) => {
-                write!(f, "(")?;
-                for val in vals {
-                    write!(f, "{},", val)?;
-                }
-                write!(f, ")")?;
-                Ok(())
-            }
-            Type::Int => write!(f, "Int"),
-            Type::Bool => write!(f, "Bool"),
-            Type::Char => write!(f, "Char"),
-            Type::String => write!(f, "String"),
-        }
-    }
-}
-
 type DebrujinIndex = usize;
-#[derive(Debug, Clone)]
-pub enum Expr {
-    Symbol(String),
-    Var(DebrujinIndex),
-    Application(Box<Expr>, Box<Expr>),
-    Value(Value),
-    If(Box<Expr>, Box<Expr>, Box<Expr>),
-    Case(Box<Expr>, Vec<(Pattern, Expr)>),
-    BinOp(Box<Expr>, Op, Box<Expr>),
-    Tuple(Vec<Expr>),
-    List(List<Expr>),
-}
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -74,7 +11,8 @@ pub enum Value {
     Function1(Box<Expr>),
     List(List<Value>),
 }
-#[derive(Debug, Clone)]
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum List<T> {
     Some(Box<T>, Box<List<T>>),
     Empty,
@@ -92,31 +30,58 @@ impl PartialEq for Value {
     }
 }
 
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Value::Int(val) => write!(f, "{}", val),
-            Value::Bool(val) => write!(f, "{}", val),
-            Value::Char(val) => write!(f, "{}", val),
-            Value::Tuple(vs) => vs.into_iter().map(|v| write!(f, "{}", v)).collect(),
-            Value::List(ls) => {
-                let mut vec = vec![];
-                let mut curr = ls;
-                while let List::Some(v, vs) = curr {
-                    vec.push(v);
-                    curr = vs;
-                }
-                let vec: Vec<String> = vec.iter().map(|v| format!("{}", v)).collect();
-                write!(f, "[{}]", vec.join(", "))
-            }
-            Value::String(val) => write!(f, "{}", val),
-            Value::Function0(_) => write!(f, "fun[]"),
-            Value::Function1(_) => write!(f, "fun[#0]"),
-        }
-    }
-}
+type IntType = i64;
 
 #[derive(Debug, Clone)]
+pub enum Decl {
+    TypeAlias(String, Type),
+    TypeSignature(String, Type),
+    FunDecl(String, Expr),
+    SExpr(Expr),
+    EndOfInstruction,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Type {
+    TypeName(String),
+    Function(Box<Type>, Box<Type>),
+    Tuple(Vec<Type>),
+    Int,
+    Bool,
+    Char,
+    String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Expr {
+    Symbol(String),
+    Var(DebrujinIndex),
+    Application(Box<Expr>, Box<Expr>),
+    If(Box<Expr>, Box<Expr>, Box<Expr>),
+    Case(Box<Expr>, Vec<(Pattern, Expr)>),
+    BinOp(Box<Expr>, Op, Box<Expr>),
+    Tuple(Vec<Expr>),
+    List(List<Expr>),
+    Literal(Literal),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Literal {
+    Int(IntType),
+    Bool(bool),
+    String(String),
+    Char(char),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Pattern {
+    Literal(Literal),
+    Var,
+    EmptyList,
+    List(Box<Pattern>, Box<Pattern>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Op {
     Add,
     Sub,

@@ -1,4 +1,4 @@
-use ast::ast::{AstNode, Expr, List, Op, Pattern, Type, Value}; use crate::error::ParsingError; use crate::error::ParsingError::GrammarError; use crate::info_parse; use log::info;
+use ast::ast::{Decl, Expr, List, Literal, Op, Pattern, Type}; use crate::error::ParsingError; use crate::error::ParsingError::GrammarError; use crate::info_parse; use log::info;
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
@@ -7,7 +7,7 @@ use pest_derive::Parser;
 #[grammar = "./grammar.pest"]
 struct LexicalHaskell;
 
-pub fn build_ast(source: String) -> Result<Vec<AstNode>, ParsingError> {
+pub fn build_ast(source: String) -> Result<Vec<Decl>, ParsingError> {
     let pairs = LexicalHaskell::parse(Rule::program, &source)?;
     info!("Found {} decls", pairs.len());
     let mut ast = vec![];
@@ -17,20 +17,20 @@ pub fn build_ast(source: String) -> Result<Vec<AstNode>, ParsingError> {
     Ok(ast)
 }
 
-fn parse_decl(decl: Pair<Rule>) -> Result<AstNode, ParsingError> {
+fn parse_decl(decl: Pair<Rule>) -> Result<Decl, ParsingError> {
     info_parse!("Declaration", decl);
     let res = match decl.as_rule() {
         Rule::type_decl => {
             let mut inner = decl.into_inner();
             let var = parse_symname(inner.next().ok_or(GrammarError)?)?;
             let typ = parse_type(inner.next().ok_or(GrammarError)?)?;
-            Ok(AstNode::TypeSignature(var, typ))
+            Ok(Decl::TypeSignature(var, typ))
         }
         Rule::type_alias => {
             let mut inner = decl.into_inner();
             let var = parse_symname(inner.next().ok_or(GrammarError)?)?;
             let typ = parse_type(inner.next().ok_or(GrammarError)?)?;
-            Ok(AstNode::TypeAlias(var, typ))
+            Ok(Decl::TypeAlias(var, typ))
         }
         Rule::func_decl => {
             let mut inner = decl.into_inner();
@@ -45,7 +45,7 @@ fn parse_decl(decl: Pair<Rule>) -> Result<AstNode, ParsingError> {
                 cases.push(nested_cases(&patterns, expr, 0));
             }
             let fun_rhs = merged_cases(cases, &fun_name)?;
-            Ok(AstNode::Decl(fun_name, fun_rhs))
+            Ok(Decl::FunDecl(fun_name, fun_rhs))
         }
         Rule::infixop
         | Rule::number
@@ -60,9 +60,9 @@ fn parse_decl(decl: Pair<Rule>) -> Result<AstNode, ParsingError> {
         | Rule::cond
         | Rule::var_name => {
             let expr = parse_expr(decl, &mut vec![])?;
-            Ok(AstNode::SExpr(expr))
+            Ok(Decl::SExpr(expr))
         }
-        Rule::EOI => Ok(AstNode::EndOfInstruction),
+        Rule::EOI => Ok(Decl::EndOfInstruction),
         _ => Err(GrammarError),
     };
     info!("Returning {:?}", &res);
@@ -132,7 +132,7 @@ fn parse_expr(expr: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Expr, Pars
             Ok(e)
         }
         Rule::number | Rule::char | Rule::bool | Rule::string => {
-            parse_literal(expr).map(Expr::Value)
+            Ok(Expr::Literal(parse_literal(expr)?))
         }
         Rule::var_name => {
             let var = parse_symname(expr)?;
@@ -209,7 +209,7 @@ fn parse_pattern(pattern: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Patt
     return match pattern.as_rule() {
         Rule::number | Rule::char | Rule::bool | Rule::string => {
             debrujin.push(String::new()); // Push for alignment
-            Ok(Pattern::Value(parse_literal(pattern)?))
+            Ok(Pattern::Literal(parse_literal(pattern)?))
         }
         Rule::var_name => {
             let var = parse_symname(pattern)?;
@@ -232,32 +232,32 @@ fn parse_pattern(pattern: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Patt
     };
 }
 
-fn parse_literal(literal: Pair<Rule>) -> Result<Value, ParsingError> {
+fn parse_literal(literal: Pair<Rule>) -> Result<Literal, ParsingError> {
     info_parse!("Literal", literal);
     return match literal.as_rule() {
         Rule::number => {
             let num = literal.as_str();
             if let Ok(val) = num.parse() {
-                return Ok(Value::Int(val));
+                return Ok(Literal::Int(val));
             }
             Err(GrammarError)
         }
         Rule::char => {
             let char = literal.as_str().chars().nth(1).ok_or(GrammarError)?;
-            Ok(Value::Char(char))
+            Ok(Literal::Char(char))
         }
         Rule::bool => {
             let boolean = literal.as_str();
             match boolean {
-                "True" => Ok(Value::Bool(true)),
-                "False" => Ok(Value::Bool(false)),
+                "True" => Ok(Literal::Bool(true)),
+                "False" => Ok(Literal::Bool(false)),
                 _ => Err(GrammarError)
             }
         }
         Rule::string => {
             let s = literal.as_str();
             let s = &s[1..s.len() - 1]; // Remove '"'
-            Ok(Value::String(s.to_string()))
+            Ok(Literal::String(s.to_string()))
         }
         _ => Err(GrammarError),
     };
