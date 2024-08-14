@@ -14,7 +14,7 @@ pub enum Pattern {
     Value(Value),
     Var,
     EmptyList,
-    List(Box<Pattern>, Box<Pattern>)
+    List(Box<Pattern>, Box<Pattern>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -25,7 +25,7 @@ pub enum Type {
     Int,
     Bool,
     Char,
-    String
+    String,
 }
 
 impl fmt::Display for Type {
@@ -44,7 +44,7 @@ impl fmt::Display for Type {
             Type::Int => write!(f, "Int"),
             Type::Bool => write!(f, "Bool"),
             Type::Char => write!(f, "Char"),
-            Type::String => write!(f, "String")
+            Type::String => write!(f, "String"),
         }
     }
 }
@@ -60,7 +60,7 @@ pub enum Expr {
     Case(Box<Expr>, Vec<(Pattern, Expr)>),
     BinOp(Box<Expr>, Op, Box<Expr>),
     Tuple(Vec<Expr>),
-    List(List<Expr>)
+    List(List<Expr>),
 }
 
 #[derive(Debug, Clone)]
@@ -72,12 +72,12 @@ pub enum Value {
     String(String),
     Function0(Box<Expr>),
     Function1(Box<Expr>),
-    List(List<Value>)
+    List(List<Value>),
 }
 #[derive(Debug, Clone)]
 pub enum List<T> {
     Some(Box<T>, Box<List<T>>),
-    Empty
+    Empty,
 }
 
 impl PartialEq for Value {
@@ -106,12 +106,9 @@ impl fmt::Display for Value {
                     vec.push(v);
                     curr = vs;
                 }
-                write!(f, "[")?;
-                for v in vec {
-                    write!(f, "{}", v)?;
-                }
-                write!(f, "]")
-            },
+                let vec: Vec<String> = vec.iter().map(|v| format!("{}", v)).collect();
+                write!(f, "[{}]", vec.join(", "))
+            }
             Value::String(val) => write!(f, "{}", val),
             Value::Function0(_) => write!(f, "fun[]"),
             Value::Function1(_) => write!(f, "fun[#0]"),

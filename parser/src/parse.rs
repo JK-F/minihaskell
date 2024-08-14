@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, Expr, List, Op, Pattern, Type, Value}; use crate::error::ParsingError; use crate::error::ParsingError::GrammarError; use crate::info_parse; use log::info;
+use ast::ast::{AstNode, Expr, List, Op, Pattern, Type, Value}; use crate::error::ParsingError; use crate::error::ParsingError::GrammarError; use crate::info_parse; use log::info;
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
@@ -119,9 +119,9 @@ fn parse_expr(expr: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Expr, Pars
         Rule::application => {
             let mut inner = expr.into_inner();
             let func_name = parse_symname(inner.next().ok_or(GrammarError)?)?;
-            let args = inner.map(|p| parse_expr(p, debrujin)).flatten();
+            let args: Vec<Expr> = inner.map(|p| parse_expr(p, debrujin)).collect::<Result<_, _>>()?;
             let var = Box::new(Expr::Symbol(func_name));
-            let expr: Expr = *args.fold(var, |exp, arg| {
+            let expr: Expr = *args.into_iter().fold(var, |exp, arg| {
                 Box::new(Expr::Application(exp, Box::new(arg)))
             });
             Ok(expr)
@@ -145,18 +145,18 @@ fn parse_expr(expr: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Expr, Pars
         }
         Rule::tuple_expr => {
             let inner = expr.into_inner();
-            let es: Vec<Expr> = inner.map(|p| parse_expr(p, debrujin)).flatten().collect();
+            let es: Vec<Expr> = inner.map(|p| parse_expr(p, debrujin)).collect::<Result<_,_>>()?;
             Ok(Expr::Tuple(es))
         }
         Rule::list_expr => {
             let inner = expr.into_inner();
-            let es: Vec<Expr> = inner.map(|p| parse_expr(p, debrujin)).flatten().collect();
+            let es: Vec<Expr> = inner.map(|p| parse_expr(p, debrujin)).rev().collect::<Result<_, _>>()?;
             let list = es.into_iter().fold(List::Empty, |acc, e| List::Some(Box::new(e), Box::new(acc)));
             Ok(Expr::List(list))
         }
         Rule::cond => {
             let inner = expr.into_inner();
-            let mut es: Vec<Expr> = inner.map(|e| parse_expr(e, debrujin)).flatten().collect();
+            let mut es: Vec<Expr> = inner.map(|e| parse_expr(e, debrujin)).collect::<Result<_,_>>()?;
             let else_expr = Box::new(es.pop().ok_or(GrammarError)?);
             let then_expr = Box::new(es.pop().ok_or(GrammarError)?);
             let test = Box::new(es.pop().ok_or(GrammarError)?);
@@ -289,7 +289,7 @@ fn parse_type(atype: Pair<Rule>) -> Result<Type, ParsingError> {
         }
         Rule::tuple_type => {
             let inner = atype.into_inner();
-            let es: Vec<Type> = inner.map(|p| parse_type(p)).flatten().collect();
+            let es: Vec<Type> = inner.map(|p| parse_type(p)).collect::<Result<_,_>>()?;
             Ok(Type::Tuple(es))
         }
         _ => Err(GrammarError),
