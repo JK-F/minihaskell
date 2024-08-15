@@ -1,36 +1,11 @@
 type DebrujinIndex = usize;
-
-#[derive(Debug, Clone)]
-pub enum Value {
-    Int(i64),
-    Bool(bool),
-    Char(char),
-    Tuple(Vec<Value>),
-    String(String),
-    Function0(Box<Expr>),
-    Function1(Box<Expr>),
-    List(List<Value>),
-}
+type IntType = i64;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum List<T> {
     Some(Box<T>, Box<List<T>>),
     Empty,
 }
-
-impl PartialEq for Value {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Value::Int(l), Value::Int(r)) => l == r,
-            (Value::Bool(l), Value::Bool(r)) => l == r,
-            (Value::Char(l), Value::Char(r)) => l == r,
-            (Value::String(l), Value::String(r)) => l == r,
-            _ => false,
-        }
-    }
-}
-
-type IntType = i64;
 
 #[derive(Debug, Clone)]
 pub enum Decl {

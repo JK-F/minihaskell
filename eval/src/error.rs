@@ -7,6 +7,8 @@ pub enum RunTimeError {
     SymbolNotFound(String),
     #[error("Expected Argument for function but found none")]
     MissingArgument,
+    #[error("Found unbound variable #{0}")]
+    VariableNotFound(usize),
     #[error("Expected type {0}, but found {1}")]
     TypeError(Type, Type),
     #[error("Reached end of program")]
