@@ -1,4 +1,4 @@
-use ast::ast::{Expr, List, Literal};
+use ast::ast::{Expr, Literal};
 use std::fmt::{Formatter, Result, Display};
 
 use crate::env::Env;
@@ -8,7 +8,8 @@ pub enum Value {
     Literal(Literal),
     Tuple(Vec<Value>),
     Closure(Expr, Env),
-    List(List<Value>),
+    List(Box<Value>, Box<Value>),
+    EmptyList
 }
 
 impl PartialEq for Value {
@@ -25,7 +26,8 @@ impl Display for Value {
         match self {
             Value::Literal(l) => write!(f, "{}", l),
             Value::Tuple(vs) => vs.into_iter().map(|v| write!(f, "{}", v)).collect(),
-            Value::List(ls) => write!(f, "{}", ls),
+            Value::List(head, tail) => write!(f, "[head: {}, tail: {}]", head, tail),
+            Value::EmptyList => write!(f, "[]"),
             Value::Closure(e, _) => write!(f, "\\_ -> {}", e),
 
         }
