@@ -52,7 +52,9 @@ pub enum Literal {
 pub enum Pattern {
     Literal(Literal),
     Var,
+    Wildcard,
     EmptyList,
+    Tuple(Vec<Pattern>),
     List(Box<Pattern>, Box<Pattern>),
 }
 

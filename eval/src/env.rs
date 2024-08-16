@@ -19,8 +19,24 @@ impl Env {
             vars: vec![],
         }
     }
+
+    pub fn debug(&self) {
+        for val in &self.vars {
+            println!("{}", val);
+        }
+    }
+
+    pub fn merged(&self, other: &Env) -> Env {
+        let mut clone = self.vars.clone();
+        clone.append(&mut other.vars.clone());
+        Env {
+            functions: Rc::clone(&self.functions),
+            vars: clone,
+        }
+    }
+
     pub fn extend_function(&self, name: String, val: Value) {
-        (*self.functions).borrow_mut().insert(name, val);
+        self.functions.borrow_mut().insert(name, val);
     }
 
     pub fn extended(&self, val: Value) -> Env {
@@ -52,7 +68,7 @@ impl Env {
 
     pub fn replace(&mut self, idx: usize, val: Value) {
         let pos = self.vars.len() - 1 - idx;
-        std::mem::replace(&mut self.vars[pos], val);
+        let _ = std::mem::replace(&mut self.vars[pos], val);
     }
 }
 

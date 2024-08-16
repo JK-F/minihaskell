@@ -5,7 +5,6 @@ pub(crate) mod macros;
 pub(crate) mod parse;
 
 pub fn parse(source: &str) -> Result<Vec<Decl>, ParsingError> {
-    let mut res =parse::build_ast(source.to_string())?;
-    res.reverse();
+    let res = parse::build_ast(source.to_string())?;
     Ok(res)
 }

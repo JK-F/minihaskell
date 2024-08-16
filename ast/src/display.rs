@@ -41,13 +41,13 @@ impl Display for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Expr::Symbol(name) => write!(f, "{}", name),
-            Expr::Var(idx) => write!(f, "{}", idx ),
+            Expr::Var(idx) => write!(f, "#{}", idx ),
             Expr::Application(fun, arg) => write!(f, "({} {})", fun, arg),
             Expr::If(a, b, c) =>  write!(f, "if {}, then {}, else {}", a, b, c),
             Expr::Tuple(es) => {
-                write!(f, "[")?;
+                write!(f, "(")?;
                 fmt_vec(f, es)?;
-                write!(f, "]")
+                write!(f, ")")
             },
             Expr::List(ls) => write!(f, "{}", ls),
             Expr::BinOp(l, op, r) => write!(f, "({} {} {})", l, op, r),
@@ -70,6 +70,12 @@ impl Display for Pattern {
             Pattern::Literal(l) => write!(f, "{}", l),
             Pattern::Var => write!(f, "var"),
             Pattern::EmptyList => write!(f, "[]"),
+            Pattern::Wildcard => write!(f, "_"),
+            Pattern::Tuple(ps) => {
+                write!(f, "(")?;
+                fmt_vec(f, ps)?;
+                write!(f, ")")
+            }
             Pattern::List(p1, p2) => write!(f, "({}:{})", p1, p2),
         }
     }

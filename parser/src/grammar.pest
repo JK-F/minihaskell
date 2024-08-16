@@ -8,7 +8,10 @@ type_alias =  { "type" ~ type_name ~ "=" ~ token_type }
 type_decl  =  { var_name ~ "::" ~ token_type }
 func_decl  =  { PUSH(var_name) ~ patterns ~ "=" ~ expr ~ (newline ~ PEEK ~ patterns ~ "=" ~ expr)* }
 patterns   =  { pattern* }
-pattern    = _{ var_name | literal | "(" ~ list_pattern ~ ")" | "[]" }
+pattern    = _{ var_name | literal | tuple_pattern | "(" ~ list_pattern ~ ")" | empty_list | wildcard }
+empty_list = { "[]" }
+wildcard   = { "_" }
+tuple_pattern  =  { "(" ~ pattern ~ ("," ~ pattern)+ ~ ")" }
 list_pattern = { pattern ~ ":" ~ list_pattern | var_name }
 // Expressions:
 expr        = _{ infixop | aexpr }
