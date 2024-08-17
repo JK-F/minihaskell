@@ -59,15 +59,16 @@ fn parse_decl(decl: Pair<Rule>) -> Result<Decl, ParsingError> {
             }
             return match &cases[..] {
                 [] => unreachable!(),
-                [(None, e)] => Ok(Decl::FunDecl(fun_name, e.clone())),
+                [(None, e)] => Ok(Decl::FunDecl(fun_name, 0, e.clone())),
+                [(Some(Pattern::Var), e)] => Ok(Decl::FunDecl(fun_name, 1, e.clone())),
                 [(None, _), ..] => Err(ParsingError::MultipleDefinitions(fun_name)),
                 [(Some(Pattern::Tuple(ps)), _), ..] => {
-                    let len = ps.len();
+                    let args = ps.len();
                     let e = if real_tuple {
                         Expr::Var(0)
                     } 
                     else {
-                        let v = (0..len)
+                        let v = (0..args)
                             .into_iter()
                             .map(|idx| Expr::Var(idx))
                             .rev()
@@ -77,12 +78,12 @@ fn parse_decl(decl: Pair<Rule>) -> Result<Decl, ParsingError> {
 
                     let cases = cases.into_iter().map(|(a, b)| (a.unwrap(), b)).collect();
                     let fun_rhs = Expr::Case(Box::new(e), cases);
-                    Ok(Decl::FunDecl(fun_name, fun_rhs))
+                    Ok(Decl::FunDecl(fun_name, if real_tuple {1} else {args}, fun_rhs))
                 }
                 _ => {
                     let cases = cases.into_iter().map(|(a, b)| (a.unwrap(), b)).collect();
                     let fun_rhs = Expr::Case(Box::new(Expr::Var(0)), cases);
-                    Ok(Decl::FunDecl(fun_name, fun_rhs))
+                    Ok(Decl::FunDecl(fun_name, 1, fun_rhs))
                 }
             };
         }
@@ -164,6 +165,9 @@ fn parse_expr(expr: Pair<Rule>, debrujin: &mut Vec<String>) -> Result<Expr, Pars
                 .into_iter()
                 .fold(List::Empty, |acc, e| List::Some(Box::new(e), Box::new(acc)));
             Ok(Expr::List(list))
+        }
+        Rule::empty_list => {
+            Ok(Expr::List(List::Empty))
         }
         Rule::cond => {
             let inner = expr.into_inner();

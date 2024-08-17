@@ -1,22 +1,13 @@
-a = [1,2,3]
-a
-
-f [] = 0
-f (x:xs) = x
-
-f [1, 2, 3]
-
 inf x = inf x + 1
 
-f [42, inf 0]
+last (x:[]) = x
+last (_:xs) = last xs
+
+last [inf 1, inf 2, 3]
 
 
-lecker (_, _, "Kuchen") = 1
-lecker (_, _, "Lakritze") = 0
+add x y = x + y
 
-x = (1, inf 0, "Kuchen")
+addone = add 1
 
-lecker x
-
-three x = 3
-three inf 1
+inf 1

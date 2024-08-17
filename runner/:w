@@ -1,0 +1,10 @@
+inf x = inf x + 1
+
+last [] = []
+last (x:[]) = x
+last (_:xs) = last xs
+
+
+last [1, inf 2, 3]
+> 3
+

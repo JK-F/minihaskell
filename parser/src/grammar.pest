@@ -12,10 +12,10 @@ pattern    = _{ var_name | literal | tuple_pattern | "(" ~ list_pattern ~ ")" | 
 empty_list = { "[]" }
 wildcard   = { "_" }
 tuple_pattern  =  { "(" ~ pattern ~ ("," ~ pattern)+ ~ ")" }
-list_pattern = { pattern ~ ":" ~ list_pattern | var_name }
+list_pattern = { pattern ~ ":" ~ (list_pattern | var_name | empty_list) }
 // Expressions:
 expr        = _{ infixop | aexpr }
-aexpr       = _{ application | paren_expr | tuple_expr | cond | literal | var_name | list_expr }
+aexpr       = _{ application | paren_expr | tuple_expr | cond | literal | var_name | list_expr | empty_list }
 infixop     =  { aexpr ~ binop ~ expr }
 application =  { var_name ~ expr+ }
 paren_expr  =  { "(" ~ expr ~ ")" }

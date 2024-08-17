@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::{cell::RefCell, rc::Rc};
 
+use log::info;
+
 use crate::error::RunTimeError;
 use crate::value::Value;
 
@@ -21,17 +23,11 @@ impl Env {
     }
 
     pub fn debug(&self) {
+        for (n, v) in self.functions.borrow().iter() {
+            println!("{}: {}", n, v);
+        };
         for val in &self.vars {
             println!("{}", val);
-        }
-    }
-
-    pub fn merged(&self, other: &Env) -> Env {
-        let mut clone = self.vars.clone();
-        clone.append(&mut other.vars.clone());
-        Env {
-            functions: Rc::clone(&self.functions),
-            vars: clone,
         }
     }
 
@@ -59,7 +55,12 @@ impl Env {
     }
 
     pub fn get(&self, idx: usize) -> RTResult<Value> {
-        let pos = self.vars.len() - 1 - idx;
+        let len = self.vars.len();
+        if idx >= len {
+            info!("Tried to access #{} but #vars is only {}", idx, len);
+            return Err(RunTimeError::VariableNotFound(idx));
+        }
+        let pos = len - 1 - idx;
         self.vars
             .get(pos)
             .cloned()

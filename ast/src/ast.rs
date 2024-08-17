@@ -11,7 +11,7 @@ pub enum List<T> {
 pub enum Decl {
     TypeAlias(String, Type),
     TypeSignature(String, Type),
-    FunDecl(String, Expr),
+    FunDecl(String, usize, Expr),
     SExpr(Expr),
     EndOfInstruction,
 }
