@@ -72,4 +72,6 @@ pub enum Op {
     Ge,
     And,
     Or,
+    Append,
+    Cons
 }

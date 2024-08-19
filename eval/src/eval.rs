@@ -5,7 +5,7 @@ use crate::value::Value;
 use log::info;
 use ast::ast::Decl::{FunDecl, EndOfInstruction, SExpr, TypeAlias, TypeSignature};
 use ast::ast::Expr::{Application, BinOp, If, Symbol, Tuple, Var};
-use ast::ast::Op::{Add, And, Div, Eq, Ge, Gt, Le, Lt, Mul, Neq, Or, Sub};
+use ast::ast::Op::{Add, And, Div, Eq, Ge, Gt, Le, Lt, Mul, Neq, Or, Sub, Append, Cons};
 use ast::ast::{Decl, Expr, List, Literal, Pattern, Type};
 
 use crate::error::RunTimeError;
@@ -133,6 +133,26 @@ fn eval_expr(env: &Env, expr: Expr) -> RTResult<Value> {
                     let rv = eval_bool(env, *r)?;
                     Ok(Value::Literal(Literal::Bool(lv || rv)))
                 }
+                Append => {
+                    let lv = eval_expr(env, *l)?;
+                    let rv = eval_expr(env, *r)?;
+                    let mut curr = lv;
+                    let mut elements = vec![];
+                    while let Value::List(x, xs) = curr {
+                        elements.push(x);
+                        match *xs {
+                            Value::Closure(expr, 0, env) => curr = eval_expr(&env, expr)?,
+                            tail => curr = tail,
+                        }
+                    };
+                    let big_list = elements.into_iter().rev().fold(Box::new(rv), |acc, x| Box::new(Value::List(x, acc)));
+                    Ok(*big_list)
+                },
+                Cons => {
+                    let lv = eval_expr(env, *l)?;
+                    let rv = eval_expr(env, *r)?;
+                    Ok(Value::List(Box::new(lv), Box::new(rv)))
+                },
             };
         }
         Application(f, e) => {

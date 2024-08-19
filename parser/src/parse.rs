@@ -199,6 +199,8 @@ fn parse_binop(infixop: Pair<Rule>) -> Result<Op, ParsingError> {
         ">=" => Ok(Op::Ge),
         "&&" => Ok(Op::And),
         "||" => Ok(Op::Or),
+        "++" => Ok(Op::Append),
+        ":" => Ok(Op::Cons),
         _ => Err(GrammarError),
     };
 }

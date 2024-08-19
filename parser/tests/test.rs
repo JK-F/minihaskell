@@ -15,4 +15,5 @@ test_parse! {
     appl_exp: "files/appl_exp.hs",
     pattern: "files/pattern.hs",
     list: "files/list.hs",
+    append: "files/append.hs",
 }

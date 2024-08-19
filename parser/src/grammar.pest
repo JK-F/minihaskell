@@ -22,7 +22,7 @@ paren_expr  =  { "(" ~ expr ~ ")" }
 tuple_expr  =  { "(" ~ expr ~ ("," ~ expr)+ ~ ")" }
 list_expr   =  { "[" ~ expr ~ ("," ~ expr)+ ~ "]" }
 cond        =  { "if" ~ expr ~ "then" ~ expr ~ "else" ~ expr }
-binop       = @{ "+" | "-" | "*" | "/" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&" | "||" }
+binop       = @{ "++" | "+" | "-" | "*" | "/" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&" | "||" | ":" }
 token_type  = _{ func_type | atype }
 atype       = _{ paren_type | tuple_type | type_name }
 func_type   =  { atype ~ "->" ~ atype }

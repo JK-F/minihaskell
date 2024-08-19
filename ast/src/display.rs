@@ -96,6 +96,8 @@ impl Display for Op {
             Op::Ge  => write!(f, ">="),
             Op::And => write!(f, "&&"),
             Op::Or  => write!(f, "||"),
+            Op::Append => write!(f, "++"),
+            Op::Cons => write!(f, ":"),
         }
     }
 }
