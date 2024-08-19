@@ -1,4 +1,3 @@
-type DebrujinIndex = usize;
 type IntType = i64;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -11,7 +10,7 @@ pub enum List<T> {
 pub enum Decl {
     TypeAlias(String, Type),
     TypeSignature(String, Type),
-    FunDecl(String, usize, Expr),
+    FunDecl(String, Vec<String>, Expr),
     SExpr(Expr),
     EndOfInstruction,
 }
@@ -29,8 +28,7 @@ pub enum Type {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    Symbol(String),
-    Var(DebrujinIndex),
+    Var(String),
     Application(Box<Expr>, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
     Case(Box<Expr>, Vec<(Pattern, Expr)>),
@@ -51,10 +49,11 @@ pub enum Literal {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
     Literal(Literal),
-    Var,
+    Var(String),
     Wildcard,
     EmptyList,
     Tuple(Vec<Pattern>),
+    FakeTuple(Vec<Pattern>),
     List(Box<Pattern>, Box<Pattern>),
 }
 

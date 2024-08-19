@@ -1,7 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::{cell::RefCell, rc::Rc};
-
-use log::info;
+use std::rc::Rc;
 
 use crate::error::RunTimeError;
 use crate::value::Value;
@@ -11,65 +10,44 @@ type RTResult<T> = Result<T, RunTimeError>;
 #[derive(Debug, Clone)]
 pub(crate) struct Env {
     functions: Rc<RefCell<HashMap<String, Value>>>,
-    vars: Vec<Value>,
+    env: HashMap<String, Value>
 }
 
 impl Env {
     pub fn new() -> Env {
         Env {
             functions: Rc::new(RefCell::new(HashMap::new())),
-            vars: vec![],
+            env: HashMap::new(),
         }
     }
 
     pub fn debug(&self) {
-        for (n, v) in self.functions.borrow().iter() {
+        for (n, v) in (*self.functions).borrow().iter() {
             println!("{}: {}", n, v);
         };
-        for val in &self.vars {
-            println!("{}", val);
+        for (n, v) in self.env.iter() {
+            println!("{}: {}", n, v);
+        };
+    }
+
+    pub fn add_function(&self, name: String, v: Value) {
+        (*self.functions).borrow_mut().insert(name, v);
+    }
+
+    pub fn extended(&self, name: String, val: Value) -> Env {
+        let mut new_env = self.env.clone();
+        new_env.insert(name, val);
+        Env { functions: Rc::clone(&self.functions), env: new_env } 
+    }
+
+    pub fn get(&self, name: &String) -> RTResult<Value> {
+        let var = self.env .get(name).cloned();
+        let fun = (*self.functions).borrow().get(name).cloned();
+        match var.or(fun) {
+            Some(val) => Ok(val),
+            None => Err(RunTimeError::VariableNotFound(name.clone())),
         }
-    }
 
-    pub fn extend_function(&self, name: String, val: Value) {
-        self.functions.borrow_mut().insert(name, val);
-    }
-
-    pub fn extended(&self, val: Value) -> Env {
-        Env {
-            functions: Rc::clone(&self.functions),
-            vars: {
-                let mut v = self.vars.clone();
-                v.push(val);
-                v
-            },
-        }
-    }
-
-    pub fn get_function(&self, name: &String) -> RTResult<Value> {
-        self.functions
-            .borrow()
-            .get(name)
-            .cloned()
-            .ok_or(RunTimeError::SymbolNotFound(name.clone()))
-    }
-
-    pub fn get(&self, idx: usize) -> RTResult<Value> {
-        let len = self.vars.len();
-        if idx >= len {
-            info!("Tried to access #{} but #vars is only {}", idx, len);
-            return Err(RunTimeError::VariableNotFound(idx));
-        }
-        let pos = len - 1 - idx;
-        self.vars
-            .get(pos)
-            .cloned()
-            .ok_or(RunTimeError::VariableNotFound(idx))
-    }
-
-    pub fn replace(&mut self, idx: usize, val: Value) {
-        let pos = self.vars.len() - 1 - idx;
-        let _ = std::mem::replace(&mut self.vars[pos], val);
     }
 }
 

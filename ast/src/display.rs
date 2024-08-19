@@ -40,14 +40,11 @@ impl Display for Literal {
 impl Display for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Expr::Symbol(name) => write!(f, "{}", name),
-            Expr::Var(idx) => write!(f, "#{}", idx ),
+            Expr::Var(name) => write!(f, "{}", name ),
             Expr::Application(fun, arg) => write!(f, "({} {})", fun, arg),
             Expr::If(a, b, c) =>  write!(f, "if {}, then {}, else {}", a, b, c),
             Expr::Tuple(es) => {
-                write!(f, "(")?;
-                fmt_vec(f, es)?;
-                write!(f, ")")
+                fmt_vec(f, es, "(", ")", ", ")
             },
             Expr::List(ls) => write!(f, "{}", ls),
             Expr::BinOp(l, op, r) => write!(f, "({} {} {})", l, op, r),
@@ -68,13 +65,14 @@ impl Display for Pattern {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Pattern::Literal(l) => write!(f, "{}", l),
-            Pattern::Var => write!(f, "var"),
+            Pattern::Var(name) => write!(f, "{}", name),
             Pattern::EmptyList => write!(f, "[]"),
             Pattern::Wildcard => write!(f, "_"),
             Pattern::Tuple(ps) => {
-                write!(f, "(")?;
-                fmt_vec(f, ps)?;
-                write!(f, ")")
+                fmt_vec(f, ps, "(", ")", ", ")
+            }
+            Pattern::FakeTuple(ps) => {
+                fmt_vec(f, ps, "", "", " ")
             }
             Pattern::List(p1, p2) => write!(f, "({}:{})", p1, p2),
         }
@@ -116,15 +114,18 @@ impl <T> Display for List<T>
     }
 }
 
-fn fmt_vec<T>(f: &mut Formatter<'_>, v: &Vec<T>) -> Result 
+fn fmt_vec<T>(f: &mut Formatter<'_>, v: &Vec<T>, open: &str, close: &str, join: &str) -> Result 
     where T: Display {
     match &v[..] {
-        [] => Ok(()),
+        [] => {
+            write!(f, "{}{}", open, close)
+        },
         [xs @ .., last] => {
+            write!(f, "{}", open)?;
             for x in xs {
-                write!(f, "{},", x)?;
+                write!(f, "{}{}", x, join)?;
             }
-            write!(f, "{}", last)
+            write!(f, "{}{}", last, close)
         }
     }
 }

@@ -7,7 +7,7 @@ use crate::env::Env;
 pub enum Value {
     Literal(Literal),
     Tuple(Vec<Value>),
-    Closure(Expr, usize, Env),
+    Closure(Expr, Vec<String>, Env),
     List(Box<Value>, Box<Value>),
     EmptyList
 }
@@ -28,7 +28,7 @@ impl Display for Value {
             Value::Tuple(vs) => vs.into_iter().map(|v| write!(f, "{},", v)).collect(),
             Value::List(head, tail) => write!(f, "[head: {}, tail: {}]", head, tail),
             Value::EmptyList => write!(f, "[]"),
-            Value::Closure(e, args, _) => write!(f, "Closure[{}]{{ {} }}", args, e),
+            Value::Closure(e, args, _) => write!(f, "Closure[{}]{{ {} }}", args.join(", "), e),
 
         }
     }

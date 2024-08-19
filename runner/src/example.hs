@@ -1,6 +1,6 @@
-inf x = inf x + 1
+comp f [] = []
+comp f (x:xs) = if (f x) then x : (comp (f) xs) else comp (f) xs
 
-last (x:[]) = x
-last (_:xs) = last xs
+filter x = x > 2
 
-last [inf 1, inf 2, 3]
+comp (filter) ([1, 2, 3, 4, 5, 6, 7, 8])

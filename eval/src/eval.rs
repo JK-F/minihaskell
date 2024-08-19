@@ -2,11 +2,11 @@ use std::iter::zip;
 
 use crate::env::Env;
 use crate::value::Value;
-use log::info;
-use ast::ast::Decl::{FunDecl, EndOfInstruction, SExpr, TypeAlias, TypeSignature};
-use ast::ast::Expr::{Application, BinOp, If, Symbol, Tuple, Var};
-use ast::ast::Op::{Add, And, Div, Eq, Ge, Gt, Le, Lt, Mul, Neq, Or, Sub, Append, Cons};
+use ast::ast::Decl::{EndOfInstruction, FunDecl, SExpr, TypeAlias, TypeSignature};
+use ast::ast::Expr::{Application, BinOp, If, Tuple, Var};
+use ast::ast::Op::{Add, And, Append, Cons, Div, Eq, Ge, Gt, Le, Lt, Mul, Neq, Or, Sub};
 use ast::ast::{Decl, Expr, List, Literal, Pattern, Type};
+use log::info;
 
 use crate::error::RunTimeError;
 
@@ -27,7 +27,7 @@ fn eval_decl(env: &Env, decl: Decl) -> RTResult<()> {
         FunDecl(name, args, e) => {
             let closure = Value::Closure(e, args, env.clone());
             info!("Storing {}: {} to env", name, closure);
-            env.extend_function(name, closure);
+            env.add_function(name, closure);
             Ok(())
         }
         SExpr(e) => {
@@ -40,15 +40,11 @@ fn eval_decl(env: &Env, decl: Decl) -> RTResult<()> {
 }
 
 fn eval_expr(env: &Env, expr: Expr) -> RTResult<Value> {
+    env.debug();
     match expr {
-        Symbol(name) => {
-            info!("Interpreting function of name {name}");
-            let v = env.get_function(&name)?;
-            handle_closure(v)
-        }
-        Var(idx) => {
-            info!("Interpreting variable #{idx}");
-            let v = env.get(idx)?;
+        Var(name) => {
+            info!("Interpreting variable {name}");
+            let v = env.get(&name)?;
             handle_closure(v)
         }
         Expr::Literal(l) => {
@@ -57,7 +53,11 @@ fn eval_expr(env: &Env, expr: Expr) -> RTResult<Value> {
         }
         Tuple(es) => {
             info!("Interpreting Tuple {:?}", es);
-            Ok(Value::Tuple(es.into_iter().map(|e| Value::Closure(e, 0, env.clone())).collect()))
+            Ok(Value::Tuple(
+                es.into_iter()
+                    .map(|e| Value::Closure(e, vec![], env.clone()))
+                    .collect(),
+            ))
         }
         If(test, ethen, eelse) => {
             info!(
@@ -141,26 +141,40 @@ fn eval_expr(env: &Env, expr: Expr) -> RTResult<Value> {
                     while let Value::List(x, xs) = curr {
                         elements.push(x);
                         match *xs {
-                            Value::Closure(expr, 0, env) => curr = eval_expr(&env, expr)?,
+                            Value::Closure(expr, _, env) => curr = eval_expr(&env, expr)?,
                             tail => curr = tail,
                         }
-                    };
-                    let big_list = elements.into_iter().rev().fold(Box::new(rv), |acc, x| Box::new(Value::List(x, acc)));
+                    }
+                    let big_list = elements
+                        .into_iter()
+                        .rev()
+                        .fold(Box::new(rv), |acc, x| Box::new(Value::List(x, acc)));
                     Ok(*big_list)
-                },
+                }
                 Cons => {
                     let lv = eval_expr(env, *l)?;
                     let rv = eval_expr(env, *r)?;
                     Ok(Value::List(Box::new(lv), Box::new(rv)))
-                },
+                }
             };
         }
         Application(f, e) => {
             info!("Application of {:?} to {:?}", f, e);
             info!("Pushing {} to env", e);
-            let new_env = env.extended(Value::Closure(*e, 0, env.clone()));
-            let return_value = eval_expr(&new_env, *f)?;
-            extend_closure(return_value, new_env.get(0)?)
+            let e_closure = Value::Closure(*e, vec![], env.clone());
+            match eval_expr(env, *f)? {
+                // Typechecker should ensure f is a function with arity > 0
+                Value::Closure(e, v, c_env) => {
+                    let mut v = v;
+                    let name = v.pop().unwrap();
+                    let new_env = c_env.extended(name, e_closure);
+                    match &v[..] {
+                        [] => eval_expr(&new_env, e),
+                        _ => Ok(Value::Closure(e, v, new_env)),
+                    }
+                }
+                _ => unreachable!(),
+            }
         }
         Expr::Case(e, cases) => {
             info!("Interpreting case on {} => {:?}", e, cases);
@@ -170,12 +184,10 @@ fn eval_expr(env: &Env, expr: Expr) -> RTResult<Value> {
         Expr::List(ls) => {
             info!("Interpreting list {:?}", ls);
             match ls {
-                List::Some(head, tail) =>  Ok(
-                    Value::List(
-                        Box::new(Value::Closure(*head, 0, env.clone())), 
-                        Box::new(Value::Closure(Expr::List(*tail), 0, env.clone()))
-                    )
-                ),
+                List::Some(head, tail) => Ok(Value::List(
+                    Box::new(Value::Closure(*head, vec![], env.clone())),
+                    Box::new(Value::Closure(Expr::List(*tail), vec![], env.clone())),
+                )),
                 List::Empty => Ok(Value::EmptyList),
             }
         }
@@ -184,19 +196,11 @@ fn eval_expr(env: &Env, expr: Expr) -> RTResult<Value> {
 
 fn handle_closure(v: Value) -> RTResult<Value> {
     match v {
-        Value::Closure(e, 0, c_env) => eval_expr(&c_env, e),
-        val => Ok(val)
-
-    }
-}
-
-fn extend_closure(v: Value, arg: Value) -> RTResult<Value> {
-    info!("Pushing {} to closure {}", arg, v);
-    match v {
-        Value::Closure(e, 0, c_env) => eval_expr(&c_env, e),
-        Value::Closure(e, 1, c_env) => eval_expr(&c_env.extended(arg), e) ,
-        Value::Closure(e, n, c_env) => Ok(Value::Closure(e, n-1, c_env.extended(arg))),
-        val => Ok(val)
+        Value::Closure(e, args, c_env) => match &args[..] {
+            [] => eval_expr(&c_env, e),
+            _ => Ok(Value::Closure(e, args, c_env)),
+        },
+        val => Ok(val),
     }
 }
 
@@ -210,7 +214,11 @@ fn eval_int(env: &Env, expr: Expr) -> RTResult<i64> {
     }
 }
 fn eval_bool(env: &Env, expr: Expr) -> RTResult<bool> {
-    match eval_expr(env, expr)? {
+    info!("Evaluating {} to bool", &expr);
+    let v = handle_closure(eval_expr(env, expr)?)?;
+    info!("Got {} ", v);
+    env.debug();
+    match v {
         Value::Literal(Literal::Bool(v)) => Ok(v),
         _ => Err(RunTimeError::TypeError(
             Type::TypeName("Bool".to_string()),
@@ -219,38 +227,34 @@ fn eval_bool(env: &Env, expr: Expr) -> RTResult<bool> {
     }
 }
 
-fn pattern_match_expr<'a>(
-    env: &Env,
-    e: Expr,
-    cases: &[(Pattern, Expr)],
-) -> RTResult<(Expr, Env)> {
+fn pattern_match_expr<'a>(env: &Env, e: Expr, cases: &[(Pattern, Expr)]) -> RTResult<(Expr, Env)> {
     for (p, body) in cases {
         if let Some(updated_env) = match_pattern(env, p, e.clone())? {
-           return Ok((body.clone(), updated_env));
+            return Ok((body.clone(), updated_env));
         }
     }
     Err(RunTimeError::NonExhaustivePattern)
 }
 
-fn match_pattern(env: &Env, p: &Pattern, e: Expr) -> RTResult<Option<Env>> { 
+fn match_pattern(env: &Env, p: &Pattern, e: Expr) -> RTResult<Option<Env>> {
     match p {
-        Pattern::Var => {
+        Pattern::Var(name) => {
             info!("Matching var pattern");
-            let new_env = env.extended(Value::Closure(e.clone(), 0, env.clone()));
+            let new_env =
+                env.extended(name.clone(), Value::Closure(e.clone(), vec![], env.clone()));
             return Ok(Some(new_env));
-        },
+        }
         Pattern::Wildcard => {
             info!("Matching wildcard pattern");
             return Ok(Some(env.clone()));
-
-        },
+        }
         Pattern::EmptyList => {
             info!("Matching [] pattern");
             let v = eval_expr(env, e.clone())?;
             if let Value::EmptyList = v {
                 return Ok(Some(env.clone()));
             }
-        },
+        }
         Pattern::Literal(l1) => {
             info!("Matching literal pattern");
             let v = eval_expr(env, e.clone())?;
@@ -259,21 +263,20 @@ fn match_pattern(env: &Env, p: &Pattern, e: Expr) -> RTResult<Option<Env>> {
                     return Ok(Some(env.clone()));
                 }
             }
-        },
-        Pattern::List(p, ps) => {
+        }
+        Pattern::List(_, _) => {
             info!("Recognized list pattern");
-            if let Value::List(head, tail) = eval_expr(env, e)? {
-                info!("Evaluated List with head: {}", &head);
-                if let Some(new_env) = matches_value(env, p, &head)? {
-                    return matches_value(&new_env, ps, &tail);
-                }
-            }
-        },
+            let v = eval_expr(env, e)?;
+            return matches_value(env, p, &v);
+        }
+        Pattern::FakeTuple(ps) => {
+            return match_pattern(env, &Pattern::Tuple(ps.to_vec()), e);
+        }
         Pattern::Tuple(ps) => {
             info!("Matching tuple pattern");
             let vs = eval_expr(env, e)?;
             return matches_value(env, &Pattern::Tuple(ps.clone()), &vs);
-        },
+        }
     }
     Ok(None)
 }
@@ -282,28 +285,39 @@ fn matches_value(env: &Env, p: &Pattern, v: &Value) -> RTResult<Option<Env>> {
     info!("Matching val {} on pattern {}", v, p);
     Ok(match (p, v) {
         (Pattern::Wildcard, _) => Some(env.clone()),
-        (Pattern::Literal(l2), Value::Literal(l1)) => if l1 == l2 {Some(env.clone())} else {None},
-        (Pattern::Var, v) => Some(env.extended(v.clone())),
+        (Pattern::Literal(l2), Value::Literal(l1)) => {
+            l1.eq(l2).then_some(env.clone())
+        }
+        (Pattern::Var(name), v) => Some(env.extended(name.clone(), v.clone())),
         (Pattern::EmptyList, Value::EmptyList) => Some(env.clone()),
-        (Pattern::List(_, _), Value::List(_, _)) => todo!(),
-        (p, Value::Closure(e, 0, inner_env)) => {
+        (Pattern::List(p1, p2), Value::List(v1, v2)) => {
+            env.debug();
+            match matches_value(env, p1, v1)? {
+                Some(new_env) => matches_value(&new_env, p2, v2)?,
+                None => None,
+            }
+        }
+        (p, Value::Closure(e, v, inner_env)) => {
+            if v.len() != 0 {
+                return Ok(None);
+            }
             let v = eval_expr(inner_env, e.clone())?;
             matches_value(env, p, &v)?
-        },
+        }
         (Pattern::Tuple(ps), Value::Tuple(vs)) => {
             info!("Got here");
             let mut curr = env.clone();
             for (p, v) in zip(ps, vs) {
                 match matches_value(env, p, v)? {
-                    Some(new_env) => {curr = new_env},
-                    None => { return Ok(None); },
+                    Some(new_env) => curr = new_env,
+                    None => {
+                        return Ok(None);
+                    }
                 }
             }
             Some(curr)
         }
+        (Pattern::FakeTuple(ps), _) => matches_value(env, &Pattern::Tuple(ps.to_vec()), v)?,
         (_, _) => None,
     })
-
-
-
 }

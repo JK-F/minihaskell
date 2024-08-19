@@ -3,12 +3,10 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum RunTimeError {
-    #[error("Symbol {0} was not defined")]
-    SymbolNotFound(String),
     #[error("Expected Argument for function but found none")]
     MissingArgument,
-    #[error("Found unbound variable #{0}")]
-    VariableNotFound(usize),
+    #[error("Could not find unbound variable {0}")]
+    VariableNotFound(String),
     #[error("Expected type {0}, but found {1}")]
     TypeError(Type, Type),
     #[error("Reached end of program")]
