@@ -156,6 +156,11 @@ fn parse_expr(expr: Pair<Rule>) -> Result<Expr, ParsingError> {
                 .fold(List::Empty, |acc, e| List::Some(Box::new(e), Box::new(acc)));
             Ok(Expr::List(list))
         }
+        Rule::range => {
+            let mut inner = expr.into_inner();
+            let start = parse_expr(inner.next().ok_or(GrammarError)?)?;
+            Ok(Expr::Range(Box::new(start), 1, None))
+        }
         Rule::empty_list => Ok(Expr::List(List::Empty)),
         Rule::cond => {
             let inner = expr.into_inner();
@@ -177,8 +182,9 @@ fn parse_binop(infixop: Pair<Rule>) -> Result<Op, ParsingError> {
         "-" => Ok(Op::Sub),
         "*" => Ok(Op::Mul),
         "/" => Ok(Op::Div),
+        "`mod`" => Ok(Op::Mod),
         "==" => Ok(Op::Eq),
-        "!=" => Ok(Op::Neq),
+        "/=" => Ok(Op::Neq),
         "<" => Ok(Op::Lt),
         ">" => Ok(Op::Gt),
         "<=" => Ok(Op::Le),
@@ -369,6 +375,7 @@ fn rename_expr(expr: Expr, old: &String, new: &String) -> Expr {
         Expr::Tuple(es) => Expr::Tuple(es.into_iter().map(|e| rename_expr(e, old, new)).collect()),
         Expr::List(ls) =>  Expr::List(rename_list(ls, old, new)),
         Expr::Literal(l) => Expr::Literal(l),
+        Expr::Range(start, step, stop) => Expr::Range(Box::new(rename_expr(*start, old, new)), step, stop),
     }
 }
 

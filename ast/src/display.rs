@@ -57,6 +57,7 @@ impl Display for Expr {
                 }
                 write!(f, "}}")
             },
+            Expr::Range(start, step, stop) => write!(f, "[{} ..+{}.. {}] ", start, step, stop.map_or("".to_string(), |x| x.to_string())),
         }
     }
 }
@@ -65,7 +66,7 @@ impl Display for Pattern {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Pattern::Literal(l) => write!(f, "{}", l),
-            Pattern::Var(name) => write!(f, "{}", name),
+            Pattern::Var(name) => write!(f, "var: {}", name),
             Pattern::EmptyList => write!(f, "[]"),
             Pattern::Wildcard => write!(f, "_"),
             Pattern::Tuple(ps) => {
@@ -86,8 +87,9 @@ impl Display for Op {
             Op::Sub => write!(f, "-"),
             Op::Mul => write!(f, "*"),
             Op::Div => write!(f, "/"),
+            Op::Mod => write!(f, "`mod`"),
             Op::Eq  => write!(f, "=="),
-            Op::Neq => write!(f, "!="),
+            Op::Neq => write!(f, "/="),
             Op::Lt  => write!(f, "<"),
             Op::Gt  => write!(f, ">"),
             Op::Le  => write!(f, "<="),

@@ -2,6 +2,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use log::info;
+
 use crate::error::RunTimeError;
 use crate::value::Value;
 
@@ -23,10 +25,10 @@ impl Env {
 
     pub fn debug(&self) {
         for (n, v) in (*self.functions).borrow().iter() {
-            println!("{}: {}", n, v);
+            info!("{}: {}", n, v);
         };
         for (n, v) in self.env.iter() {
-            println!("{}: {}", n, v);
+            info!("{}: {}", n, v);
         };
     }
 
