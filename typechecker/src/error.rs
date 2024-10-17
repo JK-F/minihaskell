@@ -1,20 +1,14 @@
-use parser::ast::Type;
+use ast::ast::Type;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum TypeCheckingError {
-    #[error("Found multiple definitions of '{0}' while typechecking")]
-    MultipleDefinitions(String),
-    #[error("Found no declarataion for the type of '{0}' but it is used by other functions")]
-    NoTypeDeclaration(String),
-    #[error("Couldn't match expected type '{0}' with actual type '{0}'")]
-    TypeMismatch(Type, Type),
-    #[error("Cannot parse this pattern pattern")]
-    UnexpectedPattern,
-    #[error("Expected Function Type for Function Value")]
-    ExpectedFunction,
-    #[error("Expected additional argument")]
-    UnboundArgument,
-    #[error("Could not Infer type of this argument")]
-    ArgumentTypeUnknown,
+pub enum TypingError {
+    #[error("Cannot unify types {0} and {1} in a list")]
+    HetrogenousList(Type, Type),
+    #[error("Cannot find type of {0}")]
+    UnknownIdentifier(String),
+    #[error("Cannot unify types {0} and {1}")]
+    CannotUnify(Type, Type),
+    #[error("Duplicate Type Variable")]
+    DuplicateTypeVariable(String),
 }

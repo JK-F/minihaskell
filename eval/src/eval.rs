@@ -244,8 +244,8 @@ fn eval_int(env: &Env, expr: Expr) -> RTResult<i64> {
     match eval_expr(env, expr)? {
         Value::Literal(Literal::Int(v)) => Ok(v),
         _ => Err(RunTimeError::TypeError(
-            Type::TypeName("Int".to_string()),
-            Type::TypeName("Later".to_string()),
+            Type::TypeVariable("Int".to_string()),
+            Type::TypeVariable("Later".to_string()),
         )),
     }
 }
@@ -254,8 +254,8 @@ fn eval_bool(env: &Env, expr: Expr) -> RTResult<bool> {
     match v {
         Value::Literal(Literal::Bool(v)) => Ok(v),
         _ => Err(RunTimeError::TypeError(
-            Type::TypeName("Bool".to_string()),
-            Type::TypeName("Later".to_string()),
+            Type::TypeVariable("Bool".to_string()),
+            Type::TypeVariable("Later".to_string()),
         )),
     }
 }

@@ -4,7 +4,7 @@ use crate::error::ParsingError;
 use crate::error::ParsingError::GrammarError;
 use crate::info_parse;
 use crate::util::gen_arg_name;
-use ast::ast::{Decl, Expr, List, Literal, Op, Pattern, Type};
+use ast::ast::{Decl, Expr, List, Literal, Op, Pattern, Program, Type};
 use log::info;
 use pest::iterators::Pair;
 use pest::Parser;
@@ -14,7 +14,7 @@ use pest_derive::Parser;
 #[grammar = "./grammar.pest"]
 struct LexicalHaskell;
 
-pub fn build_ast(source: String) -> Result<Vec<Decl>, ParsingError> {
+pub fn build_ast(source: String) -> Result<Program, ParsingError> {
     let pairs = LexicalHaskell::parse(Rule::program, &source)?;
     info!("Found {} decls", pairs.len());
     let mut ast = vec![];
@@ -120,13 +120,17 @@ fn parse_expr(expr: Pair<Rule>) -> Result<Expr, ParsingError> {
             Ok(Expr::BinOp(Box::new(e1), binop, Box::new(e2)))
         }
         Rule::application => {
-            let mut inner = expr.into_inner();
-            let var = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
-            let args: Vec<Expr> = inner.map(|p| parse_expr(p)).collect::<Result<_, _>>()?;
-            let expr: Expr = *args.into_iter().fold(var, |exp, arg| {
-                Box::new(Expr::Application(exp, Box::new(arg)))
-            });
+            let inner = expr.into_inner();
+            let exprs = inner.map(|p| parse_expr(p)).collect::<Result<Vec<Expr>, _>>()?;
+            let expr = exprs.into_iter()
+                .reduce(|acc, arg| Expr::Application(Box::new(acc), Box::new(arg)))
+                .unwrap();
             Ok(expr)
+            // f x y
+            // f, x
+            // App(f, x)
+            // App(f, x), y
+            // App(App(f, x), y)
         }
         Rule::paren_expr => {
             let mut inner = expr.into_inner();
@@ -277,7 +281,7 @@ fn parse_type(atype: Pair<Rule>) -> Result<Type, ParsingError> {
                 "Bool" => Type::Bool,
                 "Char" => Type::Char,
                 "String" => Type::String,
-                _ => Type::TypeName(name),
+                _ => Type::TypeVariable(name),
             })
         }
         Rule::func_type => {

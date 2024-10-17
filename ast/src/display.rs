@@ -1,3 +1,4 @@
+use crate::ast::Decl;
 use crate::ast::Expr;
 use crate::ast::List;
 use crate::ast::Literal;
@@ -9,15 +10,10 @@ use core::fmt::{Display, Formatter, Result};
 impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Type::TypeName(name) => write!(f, "{}", name),
-            Type::Function(left, right) => write!(f, "{} -> {}", left, right),
-            Type::Tuple(vals) => {
-                write!(f, "(")?; for val in vals {
-                    write!(f, "{},", val)?;
-                }
-                write!(f, ")")?;
-                Ok(())
-            }
+            Type::TypeVariable(name) => write!(f, "{}", name),
+            Type::Function(left, right) => write!(f, "({} -> {})", left, right),
+            Type::List(t) => write!(f, "[{}]", t),
+            Type::Tuple(vals) => write!(f, "({})", vals.into_iter().map(|val| format!("{}", val)).collect::<Vec<_>>().join(", ")),
             Type::Int => write!(f, "Int"),
             Type::Bool => write!(f, "Bool"),
             Type::Char => write!(f, "Char"),
@@ -33,6 +29,18 @@ impl Display for Literal {
             Literal::Bool(val) => write!(f, "{}", val),
             Literal::String(val) => write!(f, "{}", val),
             Literal::Char(val) => write!(f, "{}", val),
+        }
+    }
+}
+
+impl Display for Decl {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            Decl::TypeAlias(type_var, type_expr) => write!(f, "type {} = {}", type_var, type_expr),
+            Decl::TypeSignature(var_name, type_expr) => write!(f, "{} :: {}", var_name, type_expr),
+            Decl::FunDecl(var_name, args, expr) => write!(f, "{} {}= {}", var_name, args.join(" ") + " ", expr),
+            Decl::SExpr(expr) => write!(f, "{}", expr),
+            Decl::EndOfInstruction => write!(f, ""),
         }
     }
 }
@@ -66,7 +74,7 @@ impl Display for Pattern {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Pattern::Literal(l) => write!(f, "{}", l),
-            Pattern::Var(name) => write!(f, "var: {}", name),
+            Pattern::Var(name) => write!(f, "{}", name),
             Pattern::EmptyList => write!(f, "[]"),
             Pattern::Wildcard => write!(f, "_"),
             Pattern::Tuple(ps) => {

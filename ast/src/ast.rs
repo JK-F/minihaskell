@@ -1,3 +1,4 @@
+pub type Program = Vec<Decl>;
 type IntType = i64;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -6,7 +7,7 @@ pub enum List<T> {
     Empty,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Decl {
     TypeAlias(String, Type),
     TypeSignature(String, Type),
@@ -17,9 +18,10 @@ pub enum Decl {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
-    TypeName(String),
+    TypeVariable(String),
     Function(Box<Type>, Box<Type>),
     Tuple(Vec<Type>),
+    List(Box<Type>),
     Int,
     Bool,
     Char,
@@ -72,7 +74,6 @@ pub enum Op {
     Le,
     Ge,
     And,
-    Or,
-    Append,
+    Or, Append,
     Cons
 }
