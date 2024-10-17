@@ -277,7 +277,7 @@ fn parse_type(atype: Pair<Rule>) -> Result<Type, ParsingError> {
         Rule::type_name => {
             let name = parse_symname(atype)?;
             Ok(match name.as_str() {
-                "Int" => Type::Int,
+                "Int" | "Integer" => Type::Int,
                 "Bool" => Type::Bool,
                 "Char" => Type::Char,
                 "String" => Type::String,
