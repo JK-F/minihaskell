@@ -3,10 +3,10 @@ WHITESPACE = _{ " " }
 newline    = _{ "\n" }
 // Program:
 program    = _{ SOI ~ (decl ~ newline)+ ~ newline? ~ EOI }
-decl       = _{ func_decl | type_decl | type_alias | expr | "" }
+decl       = _{ type_alias | fun_decl | type_decl | expr | "" }
 type_alias =  { "type" ~ type_name ~ "=" ~ token_type }
 type_decl  =  { var_name ~ "::" ~ token_type }
-func_decl  =  { PUSH(var_name) ~ patterns ~ "=" ~ expr ~ (newline ~ PEEK ~ patterns ~ "=" ~ expr)* }
+fun_decl  =  { PUSH(var_name) ~ patterns ~ "=" ~ expr ~ (newline ~ PEEK ~ patterns ~ "=" ~ expr)* }
 patterns   =  { pattern* }
 pattern    = _{ var_name | literal | tuple_pattern | "(" ~ list_pattern ~ ")" | empty_list | wildcard }
 empty_list = { "[]" }
@@ -25,11 +25,13 @@ list_expr   =  { "[" ~ expr ~ ("," ~ expr)+ ~ "]" }
 range       =  { "[" ~ number ~ ".." ~ "]" }
 cond        =  { "if" ~ expr ~ "then" ~ expr ~ "else" ~ expr }
 binop       = @{ "++" | "+" | "-" | "*" | "/=" |  "/" | "==" | "<" | ">" | "<=" | ">=" | "&&" | "||" | ":" | "`mod`" }
-token_type  = _{ func_type | atype }
-atype       = _{ paren_type | tuple_type | type_name }
-func_type   =  { atype ~ "->" ~ atype }
-paren_type  =  { "(" ~ token_type ~ ")" }
+token_type  = _{ fun_type | atype  }
+atype       = _{ tuple_type | list_type | type_name | paren_type | paren_fun_type }
+fun_type   =  { atype ~ ("->" ~ atype)+ }
+paren_fun_type  =  { "(" ~ fun_type ~ ")" }
+paren_type  =  { "(" ~ atype ~ ")" }
 tuple_type  =  { "(" ~ token_type ~ ("," ~ token_type)+ ~ ")" }
+list_type   =  { "[" ~ token_type ~ "]" }
 // Literals
 literal = _{ number | char | bool | string }
 number  = @{ ASCII_DIGIT+ }

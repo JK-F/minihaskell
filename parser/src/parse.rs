@@ -39,9 +39,9 @@ fn parse_decl(decl: Pair<Rule>) -> Result<Decl, ParsingError> {
             let typ = parse_type(inner.next().ok_or(GrammarError)?)?;
             Ok(Decl::TypeAlias(var, typ))
         }
-        Rule::func_decl => {
+        Rule::fun_decl => {
             let mut inner = decl.into_inner();
-            // We knwo that there must be a symname next based on the rule being a func_decl
+            // We knwo that there must be a symname next based on the rule being a fun_decl
             let fun_name = parse_symname(inner.next().ok_or(GrammarError)?)?;
             let mut cases = vec![];
 
@@ -122,10 +122,9 @@ fn parse_expr(expr: Pair<Rule>) -> Result<Expr, ParsingError> {
         Rule::application => {
             let inner = expr.into_inner();
             let exprs = inner.map(|p| parse_expr(p)).collect::<Result<Vec<Expr>, _>>()?;
-            let expr = exprs.into_iter()
+            exprs.into_iter()
                 .reduce(|acc, arg| Expr::Application(Box::new(acc), Box::new(arg)))
-                .unwrap();
-            Ok(expr)
+                .ok_or(GrammarError)
             // f x y
             // f, x
             // App(f, x)
@@ -284,11 +283,13 @@ fn parse_type(atype: Pair<Rule>) -> Result<Type, ParsingError> {
                 _ => Type::TypeVariable(name),
             })
         }
-        Rule::func_type => {
-            let mut inner = atype.into_inner();
-            let t1 = parse_type(inner.next().ok_or(GrammarError)?)?;
-            let t2 = parse_type(inner.next().ok_or(GrammarError)?)?;
-            Ok(Type::Function(Box::new(t1), Box::new(t2)))
+        Rule::fun_type | Rule::paren_fun_type => {
+            let inner = atype.into_inner();
+            let types: Vec<Type> = inner.map(|p| parse_type(p)).collect::<Result<_, _>>()?;
+            types.into_iter()
+                .rev()
+                .reduce(|acc, arg| Type::Function(Box::new(arg), Box::new(acc)))
+                .ok_or(GrammarError)
         }
         Rule::paren_type => {
             let mut inner = atype.into_inner();
@@ -300,6 +301,7 @@ fn parse_type(atype: Pair<Rule>) -> Result<Type, ParsingError> {
             let es: Vec<Type> = inner.map(|p| parse_type(p)).collect::<Result<_, _>>()?;
             Ok(Type::Tuple(es))
         }
+        Rule::list_type => Ok(Type::List( Box::new(atype.into_inner().next().map(parse_type).ok_or(GrammarError)??))),
         _ => Err(GrammarError),
     };
 }
