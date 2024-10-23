@@ -5,5 +5,6 @@ edition = "2021"
 
 [dependencies]
 parser = { path = "../parser" }
+typechecker = { path = "../typechecker" }
 eval = { path = "../eval" }
 env_logger = "0.11.5"

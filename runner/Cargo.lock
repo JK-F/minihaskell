@@ -305,6 +305,7 @@ dependencies = [
  "env_logger",
  "eval",
  "parser",
+ "typechecker",
 ]
 
 [[package]]
@@ -347,6 +348,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "typechecker"
+version = "0.1.0"
+dependencies = [
+ "ast",
+ "env_logger",
+ "log",
+ "parser",
+ "thiserror",
 ]
 
 [[package]]

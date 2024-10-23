@@ -1,6 +1,7 @@
 use std::{env, process::exit};
 
 use eval::eval;
+use typechecker::typecheck;
 use parser::parse;
 
 
@@ -12,6 +13,7 @@ fn main() {
             match std::fs::read_to_string(path) {
                 Ok(source) => {
                     let p = parse(&source).unwrap();
+                    typecheck(&p).unwrap();
                     eval(p).unwrap();
                 }
                 Err(err) => {
