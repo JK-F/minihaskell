@@ -22,6 +22,7 @@ fn fresh_name() -> TypeVariable {
 
 impl Substitution {
     fn extended(self, tv: TypeVariable, t: Type) -> Result<Substitution, TypingError> {
+        info!("Extending substitution with {} -> {}", tv, t);
         if let Type::TypeVariable(tv2) = &t {
             if tv.eq(tv2) {
                 return Ok(self)
@@ -88,7 +89,7 @@ fn typecheck_decl(type_env: &mut TypingEnvironment, subst: Substitution, decl: &
     match decl {
         Decl::TypeAlias(var_name, type1) => {
             info!("Introducing type alias {} = {}", var_name, type1);
-            unify(subst, &Type::TypeVariable(var_name.clone()), type1)
+            subst.extended(var_name.clone(), type1.clone())
         }
         Decl::TypeSignature(var_name, type1) => {
             info!("Introducing type signature {} :: {}", var_name, type1);
@@ -107,7 +108,8 @@ fn typecheck_decl(type_env: &mut TypingEnvironment, subst: Substitution, decl: &
             for (var, fresh_type) in args.clone() {
                 type_env.insert(var.clone(), (vec![], fresh_type));
             }
-            let (subst, return_type) = typecheck_expression(type_env, expr)?;
+            let (return_subst, return_type) = typecheck_expression(type_env, expr)?;
+            let subst = subst_combine(subst, return_subst);
             let fun_type = args.into_iter().map(|(_, arg_type)| arg_type)
                 .fold(return_type, |acc, arg_type| Type::Function(Box::new(arg_type), Box::new(acc)));
             info!("Resulting in fun_type {}", fun_type);
@@ -224,10 +226,10 @@ fn typecheck_expression(type_env: &mut TypingEnvironment, expr: &Expr) -> Result
                     let (subst_first, type_first) = typecheck_expression(type_env, first)?;
                     let (subst_tail, type_tail) = typecheck_expression(type_env, &Expr::List(*tail.clone()))?;
                     let subst = subst_combine(subst_first, subst_tail);
-                    let subst = unify(subst, &type_first, &type_tail)?;
-                    Ok((subst, type_first))                    
+                    let subst = unify(subst, &Type::List(Box::new(type_first.clone())), &type_tail)?;
+                    Ok((subst, Type::List(Box::new(type_first))))
                 },
-                List::Empty => Ok((Substitution::id_subst(), Type::TypeVariable(fresh_name()))),
+                List::Empty => Ok((Substitution::id_subst(), Type::List(Box::new(Type::TypeVariable(fresh_name()))))),
             }
         }
         Expr::Range(from, step, to) => {
@@ -333,6 +335,7 @@ fn unify(phi: Substitution, t1: &Type, t2: &Type) -> Result<Substitution, Typing
         (Type::TypeVariable(tv_name), t2) | (t2, Type::TypeVariable(tv_name)) => {
             let phit = sub_type(&phi, &t2);
             let phitvn = phi.apply(&tv_name);
+            info!("Unification: Translated {} to {}", tv_name, phitvn);
             if phitvn == Type::TypeVariable(tv_name.clone()) {
                 return phi.extended(tv_name.clone(), phit);
             }
