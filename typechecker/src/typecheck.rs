@@ -233,9 +233,21 @@ fn typecheck_expression(type_env: &mut TypingEnvironment, expr: &Expr) -> Result
             }
         }
         Expr::Range(from, step, to) => {
-            info!("Typechecking range from {} - {} > {}", from, step, to.unwrap_or(-1));
-            let (subst, type_from) = typecheck_expression(type_env, from)?;
-            let subst = unify(subst, &type_from, &Type::Int)?;
+            info!("Typechecking range {}", expr);
+            let (subst_from, type_from) = typecheck_expression(type_env, from)?;
+            let subst_from = unify(subst_from, &type_from, &Type::Int)?;
+
+            let (subst_step, type_step) = typecheck_expression(type_env, step)?;
+            let subst_step = unify(subst_step, &type_step, &Type::Int)?;
+            let subst = subst_combine(subst_step, subst_from);
+            let subst = match to {
+                Some(to) => {
+                    let (subst_to, type_to) = typecheck_expression(type_env, to)?;
+                    let subst_to = unify(subst_to, &type_to, &Type::Int)?;
+                    subst_combine(subst_to, subst)
+                },
+                None => subst,
+            };
             Ok((subst, Type::List(Box::new(Type::Int))))
         },
         Expr::Literal(Literal::Int(_)) => Ok((Substitution::id_subst(), Type::Int)),

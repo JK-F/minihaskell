@@ -65,7 +65,13 @@ impl Display for Expr {
                 }
                 write!(f, "}}")
             },
-            Expr::Range(start, step, stop) => write!(f, "[{} ..+{}.. {}] ", start, step, stop.map_or("".to_string(), |x| x.to_string())),
+            Expr::Range(start, step, last) => {
+                match last {
+                    Some(last) => write!(f, "[{}, ..{}.., {}] ", start, step, last),
+                    None => write!(f, "[{}, ..{}..] ", start, step),
+                }
+                
+            }
         }
     }
 }

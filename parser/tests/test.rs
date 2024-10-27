@@ -39,6 +39,7 @@ test_parse! {
     pattern: "files/pattern.hs",
     list: "files/list.hs",
     append: "files/append.hs",
+    ranges: "files/ranges.hs",
 }
 
 #[test]

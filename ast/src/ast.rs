@@ -37,7 +37,7 @@ pub enum Expr {
     BinOp(Box<Expr>, Op, Box<Expr>),
     Tuple(Vec<Expr>),
     List(List<Expr>),
-    Range(Box<Expr>, IntType, Option<IntType>),
+    Range(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
     Literal(Literal),
 }
 

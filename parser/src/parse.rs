@@ -159,10 +159,29 @@ fn parse_expr(expr: Pair<Rule>) -> Result<Expr, ParsingError> {
                 .fold(List::Empty, |acc, e| List::Some(Box::new(e), Box::new(acc)));
             Ok(Expr::List(list))
         }
-        Rule::range => {
+        Rule::open_range => {
             let mut inner = expr.into_inner();
-            let start = parse_expr(inner.next().ok_or(GrammarError)?)?;
-            Ok(Expr::Range(Box::new(start), 1, None))
+            let first = parse_expr(inner.next().ok_or(GrammarError)?)?;
+            Ok(Expr::Range(Box::new(first), Box::new(Expr::Literal(Literal::Int(1))), None))
+        }
+        Rule::open_step_range => {
+            let mut inner = expr.into_inner();
+            let first = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
+            let second = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
+            Ok(Expr::Range(first.clone(), Box::new(Expr::BinOp(second, Op::Sub, first)), None))
+        }
+        Rule::closed_range => {
+            let mut inner = expr.into_inner();
+            let first = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
+            let last = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
+            Ok(Expr::Range(first.clone(), Box::new(Expr::Literal(Literal::Int(1))), Some(last)))
+        }
+        Rule::closed_step_range => {
+            let mut inner = expr.into_inner();
+            let first = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
+            let second = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
+            let last = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
+            Ok(Expr::Range(first.clone(), Box::new(Expr::BinOp(second, Op::Sub, first)), Some(last)))
         }
         Rule::empty_list => Ok(Expr::List(List::Empty)),
         Rule::cond => {

@@ -208,6 +208,8 @@ fn eval_expr(env: &Env, expr: Expr) -> RTResult<Value> {
         }
         Range(start, step, stop) => {
             let start = eval_int(env, *start)?;
+            let step = eval_int(env, *step)?;
+            let stop = stop.map(|stop| eval_int(env, *stop)).transpose()?;
             if let Some(stop) = stop {
                 if start > stop {
                     return Ok(Value::EmptyList);
@@ -218,8 +220,8 @@ fn eval_expr(env: &Env, expr: Expr) -> RTResult<Value> {
                 Box::new(Value::Closure(
                     Range(
                         Box::new(Expr::Literal(Literal::Int(start + step))),
-                        step,
-                        stop,
+                        Box::new(Expr::Literal(Literal::Int(step))),
+                        stop.map(|x| Box::new(Expr::Literal(Literal::Int(x)))),
                     ),
                     vec![],
                     env.clone(),

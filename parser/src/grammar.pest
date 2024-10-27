@@ -2,36 +2,39 @@
 WHITESPACE = _{ " " }
 newline    = _{ "\n" }
 // Program:
-program    = _{ SOI ~ (decl ~ newline)+ ~ newline? ~ EOI }
-decl       = _{ type_alias | fun_decl | type_decl | expr | "" }
-type_alias =  { "type" ~ type_name ~ "=" ~ token_type }
-type_decl  =  { var_name ~ "::" ~ token_type }
-fun_decl  =  { PUSH(var_name) ~ patterns ~ "=" ~ expr ~ (newline ~ PEEK ~ patterns ~ "=" ~ expr)* }
-patterns   =  { pattern* }
-pattern    = _{ var_name | literal | tuple_pattern | "(" ~ list_pattern ~ ")" | empty_list | wildcard }
-empty_list = { "[]" }
-wildcard   = { "_" }
-tuple_pattern  =  { "(" ~ pattern ~ ("," ~ pattern)+ ~ ")" }
-list_pattern = { pattern ~ ":" ~ (list_pattern | var_name | empty_list) }
+program       = _{ SOI ~ (decl ~ newline)+ ~ newline? ~ EOI }
+decl          = _{ type_alias | fun_decl | type_decl | expr | "" }
+type_alias    =  { "type" ~ type_name ~ "=" ~ token_type }
+type_decl     =  { var_name ~ "::" ~ token_type }
+fun_decl      =  { PUSH(var_name) ~ patterns ~ "=" ~ expr ~ (newline ~ PEEK ~ patterns ~ "=" ~ expr)* }
+patterns      =  { pattern* }
+pattern       = _{ var_name | literal | tuple_pattern | "(" ~ list_pattern ~ ")" | empty_list | wildcard }
+empty_list    =  { "[]" }
+wildcard      =  { "_" }
+tuple_pattern =  { "(" ~ pattern ~ ("," ~ pattern)+ ~ ")" }
+list_pattern  =  { pattern ~ ":" ~ (list_pattern | var_name | empty_list) }
 // Expressions:
-expr        = _{ application | io_expr }
-io_expr        = _{ infixop | aexpr }
-aexpr       = _{ paren_expr | tuple_expr | cond | literal | var_name | list_expr | empty_list | range }
-infixop     =  { aexpr ~ binop ~ expr }
-application =  { io_expr ~ io_expr+ }
-paren_expr  =  { "(" ~ expr ~ ")" }
-tuple_expr  =  { "(" ~ expr ~ ("," ~ expr)+ ~ ")" }
-list_expr   =  { "[" ~ expr ~ ("," ~ expr)+ ~ "]" }
-range       =  { "[" ~ number ~ ".." ~ "]" }
-cond        =  { "if" ~ expr ~ "then" ~ expr ~ "else" ~ expr }
-binop       = @{ "++" | "+" | "-" | "*" | "/=" |  "/" | "==" | "<" | ">" | "<=" | ">=" | "&&" | "||" | ":" | "`mod`" }
-token_type  = _{ fun_type | atype  }
-atype       = _{ tuple_type | list_type | type_name | paren_type | paren_fun_type }
-fun_type   =  { atype ~ ("->" ~ atype)+ }
-paren_fun_type  =  { "(" ~ fun_type ~ ")" }
-paren_type  =  { "(" ~ atype ~ ")" }
-tuple_type  =  { "(" ~ token_type ~ ("," ~ token_type)+ ~ ")" }
-list_type   =  { "[" ~ token_type ~ "]" }
+expr              = _{ application | io_expr }
+io_expr           = _{ infixop | aexpr }
+aexpr             = _{ paren_expr | tuple_expr | cond | literal | var_name | list_expr | empty_list | open_range | open_step_range | closed_range | closed_step_range }
+infixop           =  { aexpr ~ binop ~ expr }
+application       =  { io_expr ~ io_expr+ }
+paren_expr        =  { "(" ~ expr ~ ")" }
+tuple_expr        =  { "(" ~ expr ~ ("," ~ expr)+ ~ ")" }
+list_expr         =  { "[" ~ expr ~ ("," ~ expr)+ ~ "]" }
+open_range        =  { "[" ~ number ~ ".." ~ "]" }
+open_step_range   =  { "[" ~ number ~ "," ~ number ~ ".." ~ "]" }
+closed_range      =  { "[" ~ number ~ ".." ~ number ~ "]" }
+closed_step_range =  { "[" ~ number ~ "," ~ number ~ ".." ~ number ~ "]" }
+cond              =  { "if" ~ expr ~ "then" ~ expr ~ "else" ~ expr }
+binop             = @{ "++" | "+" | "-" | "*" | "/=" | "/" | "==" | "<" | ">" | "<=" | ">=" | "&&" | "||" | ":" | "`mod`" }
+token_type        = _{ fun_type | atype }
+atype             = _{ tuple_type | list_type | type_name | paren_type | paren_fun_type }
+fun_type          =  { atype ~ ("->" ~ atype)+ }
+paren_fun_type    =  { "(" ~ fun_type ~ ")" }
+paren_type        =  { "(" ~ atype ~ ")" }
+tuple_type        =  { "(" ~ token_type ~ ("," ~ token_type)+ ~ ")" }
+list_type         =  { "[" ~ token_type ~ "]" }
 // Literals
 literal = _{ number | char | bool | string }
 number  = @{ ASCII_DIGIT+ }
@@ -40,5 +43,5 @@ bool    = @{ "True" | "False" }
 string  = @{ "\"" ~ (!("\"" | "\\") ~ ASCII)* ~ "\"" }
 
 type_name = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
-var_name  = @{ !reserved ~ ASCII_ALPHA_LOWER ~ ASCII_ALPHANUMERIC* }
+var_name  = @{ !reserved ~ ( "_" ~ ASCII_ALPHANUMERIC* | ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "_")*) }
 reserved  = _{ "if" | "then" | "else" | "type" }
