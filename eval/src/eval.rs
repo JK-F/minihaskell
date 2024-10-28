@@ -13,14 +13,14 @@ use crate::error::RunTimeError;
 pub type RTResult<T> = Result<T, RunTimeError>;
 
 pub fn eval(program: Vec<Decl>) -> RTResult<()> {
-    let env = Env::new();
+    let mut env = Env::new();
     for decl in program {
-        eval_decl(&env, decl)?;
+        eval_decl(&mut env, decl)?;
     }
     Ok(())
 }
 
-fn eval_decl(env: &Env, decl: Decl) -> RTResult<()> {
+fn eval_decl(env: &mut Env, decl: Decl) -> RTResult<()> {
     match decl {
         TypeAlias(_, _) => Ok(()),
         TypeSignature(_, _) => Ok(()),

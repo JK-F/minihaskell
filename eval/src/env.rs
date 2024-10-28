@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::rc::Rc;
 
 use log::info;
@@ -12,7 +13,7 @@ type RTResult<T> = Result<T, RunTimeError>;
 #[derive(Debug, Clone)]
 pub(crate) struct Env {
     functions: Rc<RefCell<HashMap<String, Value>>>,
-    env: HashMap<String, Value>
+    env: HashMap<String, Rc<Value>>
 }
 
 impl Env {
@@ -32,22 +33,27 @@ impl Env {
         };
     }
 
-    pub fn add_function(&self, name: String, v: Value) {
+    pub fn add_function(&mut self, name: String, v: Value) {
         (*self.functions).borrow_mut().insert(name, v);
     }
 
     pub fn extended(&self, name: String, val: Value) -> Env {
-        let mut new_env = self.env.clone();
-        new_env.insert(name, val);
-        Env { functions: Rc::clone(&self.functions), env: new_env } 
+        let functions = self.functions.clone();
+        let mut env = self.env.clone();
+        env.insert(name, Rc::new(val));
+        Env { functions, env }
     }
 
     pub fn get(&self, name: &String) -> RTResult<Value> {
-        let var = self.env .get(name).cloned();
-        let fun = (*self.functions).borrow().get(name).cloned();
-        match var.or(fun) {
-            Some(val) => Ok(val),
-            None => Err(RunTimeError::VariableNotFound(name.clone())),
+        let var = self.env.get(name);
+        match var {
+            Some(val) => Ok((**val).clone()),
+            None => {
+                match (*self.functions).borrow().get(name) {
+                    Some(val) => Ok(val.clone()),
+                    None => Err(RunTimeError::VariableNotFound(name.clone())),
+                }
+            }
         }
 
     }
