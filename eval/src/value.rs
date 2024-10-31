@@ -1,5 +1,5 @@
 use ast::ast::{Expr, Literal};
-use std::fmt::{Formatter, Result, Display};
+use std::fmt::{Debug, Display, Formatter, Result};
 
 use crate::env::Env;
 
@@ -26,7 +26,19 @@ impl Display for Value {
         match self {
             Value::Literal(l) => write!(f, "{}", l),
             Value::Tuple(vs) => vs.into_iter().map(|v| write!(f, "{},", v)).collect(),
-            Value::List(head, tail) => write!(f, "[head: {}, tail: {}]", head, tail),
+            Value::List(head, tail) => {
+                let mut vals = vec![head];
+                let mut current = tail;
+                while let Value::List(elem, next) = current.as_ref() {
+                    vals.push(elem);
+                    current= next;
+                }
+                if !matches!(current.as_ref(), Value::EmptyList) {
+                    vals.push(current);
+                }
+
+                write!(f, "[{}]", vals.iter().map(|x| format!("{}", x)).collect::<Vec<_>>().join(", ") )
+            },
             Value::EmptyList => write!(f, "[]"),
             Value::Closure(e, args, _) => write!(f, "Closure[{}]{{ {} }}", args.join(", "), e),
 
