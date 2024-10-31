@@ -233,9 +233,12 @@ fn eval_expr(env: &Env, expr: Expr) -> RTResult<Value> {
 
 fn handle_closure(v: Value) -> RTResult<Value> {
     match v {
-        Value::Closure(e, args, c_env) => match &args[..] {
-            [] => eval_expr(&c_env, e),
-            _ => Ok(Value::Closure(e, args, c_env)),
+        Value::Closure(e, args, c_env) => {
+            if args.is_empty() {
+                eval_expr(&c_env, e)
+            } else {
+                Ok(Value::Closure(e, args, c_env))
+            }
         },
         val => Ok(val),
     }
