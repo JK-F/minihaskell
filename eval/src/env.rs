@@ -57,6 +57,12 @@ impl Env {
         }
 
     }
+    pub fn update_value(&mut self, name: &String, val:Value) {
+        if self.env.contains_key(name) {
+            self.env.insert(name.to_string(), Rc::new(val));
+
+        }
+    }
 }
 
 impl Default for Env {
