@@ -332,7 +332,7 @@ fn matches_value(env: &mut Env, p: &Pattern, v: &Value) -> RTResult<Option<Env>>
         (Pattern::Tuple(ps), Value::Tuple(vs)) => {
             let mut curr = env.clone();
             for (p, v) in zip(ps, vs) {
-                match matches_value(env, p, v)? {
+                match matches_value(&mut curr, p, v)? {
                     Some(new_env) => curr = new_env,
                     None => {
                         return Ok(None);
