@@ -33,6 +33,8 @@ pub enum Expr {
     Var(String),
     Application(Box<Expr>, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
+    Let(String, Box<Expr>, Box<Expr>),
+    Lambda(String, Box<Expr>),
     Case(Box<Expr>, Vec<(Pattern, Expr)>),
     BinOp(Box<Expr>, Op, Box<Expr>),
     Tuple(Vec<Expr>),

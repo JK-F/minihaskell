@@ -93,6 +93,7 @@ fn typecheck_decl(type_env: &mut TypingEnvironment, subst: Substitution, decl: &
         }
         Decl::TypeSignature(var_name, type1) => {
             info!("Introducing type signature {} :: {}", var_name, type1);
+            let _v = tvars_in(type1);
             if let Some((_, type2)) = type_env.insert(var_name.clone(), (vec![], type1.clone())) {
                 return unify(subst, type1, &type2);
             } 
@@ -132,9 +133,9 @@ fn subst_combine(left: Substitution, right: Substitution) -> Substitution {
 }
 
 fn typecheck_expression(type_env: &mut TypingEnvironment, expr: &Expr) -> Result<(Substitution, Type), TypingError> {
+    info!("Typechecking expr {}", expr);
     match expr {
         Expr::Var(x) => {
-            info!("Typechecking variable {}", x);
             let (scheme_vars, t) = type_env.get(x).ok_or(TypingError::UnknownIdentifier(x.clone()))?;
             let map = scheme_vars.into_iter()
                 .map(|var| (var.clone(), Type::TypeVariable(fresh_name())))
@@ -145,9 +146,8 @@ fn typecheck_expression(type_env: &mut TypingEnvironment, expr: &Expr) -> Result
             Ok( (Substitution::id_subst(), t) )
         }
         Expr::Application(f, e) => {
-            info!("Typechecking application of {} {}", f, e);
             let (phi, type_f) = typecheck_expression(type_env, f)?;
-            let mut new_env = sub_type_env(&phi, type_env.clone());
+            let mut new_env = sub_type_env(&phi, &type_env);
             let (psi, type_e) = typecheck_expression(&mut new_env, e)?;
             let subst = subst_combine(psi, phi);
             let tv_name = fresh_name();
@@ -156,7 +156,6 @@ fn typecheck_expression(type_env: &mut TypingEnvironment, expr: &Expr) -> Result
             Ok((subst, t))
         },
         Expr::If(cond, then_branch, else_branch) => {
-            info!("Typechecking conditional if {} then {} else {}", cond, then_branch, else_branch);
             let (phi, type_cond) = typecheck_expression(type_env, cond)?;
             let (subst_then, type_then) = typecheck_expression(type_env, then_branch)?;
             let (subst_else, type_else) = typecheck_expression(type_env, else_branch)?;
@@ -166,8 +165,20 @@ fn typecheck_expression(type_env: &mut TypingEnvironment, expr: &Expr) -> Result
             let subst = unify(subst, &type_then, &type_else)?;
             Ok((subst, type_then))
         },
+        Expr::Lambda(arg, expr) => {
+            let mut type_env = type_env.clone();
+            let arg_type = Type::TypeVariable(fresh_name());
+            type_env.insert(arg.clone(), (vec![], arg_type.clone()));
+            let (subst, ret_type) = typecheck_expression(&mut type_env, expr)?;
+            Ok((subst, Type::Function(Box::new(arg_type), Box::new(ret_type))))
+        }
+        Expr::Let(var, expr1, expr2) => {
+            let (subst, var_type) = typecheck_expression(type_env, &expr1)?;
+            let mut type_env = sub_type_env(&subst, type_env);
+            let _ = type_env.insert(var.clone(), (vec![], var_type));
+            typecheck_expression(&mut type_env, &expr2)
+        }
         Expr::Case(case_expr, cases) => {
-            info!("Typechecking case on {} {{ {} }}", case_expr, cases.into_iter().map(|(p, e)| format!("{} -> {}", p, e)).collect::<Vec<_>>().join("; "));
             let type_env = &mut type_env.clone();
             let (expr_subst, case_expr_type) = typecheck_expression(type_env, case_expr)?;
             let mut subst = expr_subst;
@@ -186,7 +197,6 @@ fn typecheck_expression(type_env: &mut TypingEnvironment, expr: &Expr) -> Result
             Ok((subst, return_type.unwrap()))
         },
         Expr::BinOp(left, op, right) => {
-            info!("Typechecking op {} {} {}", left, op, right);
             let (left_subst, left_type) = typecheck_expression(type_env, left)?;
             let (right_subst, right_type) = typecheck_expression(type_env, right)?;
             let subst = subst_combine(left_subst, right_subst);
@@ -216,11 +226,9 @@ fn typecheck_expression(type_env: &mut TypingEnvironment, expr: &Expr) -> Result
             }
         },
         Expr::Tuple(es) => {
-            info!("Typechecking tuple ({})", es.into_iter().map(|e| format!("{}", e)).collect::<Vec<_>>().join(", "));
             typecheck_list(type_env, es).map(|(subst, ts)| (subst, Type::Tuple(ts)))
         },
         Expr::List(es) => {
-            info!("Typechecking list {}", es);
             match es {
                 List::Some(first, tail) => {
                     let (subst_first, type_first) = typecheck_expression(type_env, first)?;
@@ -233,7 +241,6 @@ fn typecheck_expression(type_env: &mut TypingEnvironment, expr: &Expr) -> Result
             }
         }
         Expr::Range(from, step, to) => {
-            info!("Typechecking range {}", expr);
             let (subst_from, type_from) = typecheck_expression(type_env, from)?;
             let subst_from = unify(subst_from, &type_from, &Type::Int)?;
 
@@ -309,7 +316,7 @@ fn typecheck_list(type_env: &TypingEnvironment, exprs: &Vec<Expr>) -> Result<(Su
     let mut types = vec![];
     for expr in exprs {
         let (subst, t) = typecheck_expression(&mut env, expr)?;
-        env = sub_type_env(&subst, env);
+        env = sub_type_env(&subst, &env);
         substs.push(subst);
         types.push(t);
     }
@@ -318,14 +325,14 @@ fn typecheck_list(type_env: &TypingEnvironment, exprs: &Vec<Expr>) -> Result<(Su
 }
 
 
-fn sub_type_env(subst: &Substitution, type_env: TypingEnvironment) -> TypingEnvironment{
-    type_env.into_iter().map(|(x, scheme_type)| (x, sub_scheme(subst, scheme_type))).collect()
+fn sub_type_env(subst: &Substitution, type_env: &TypingEnvironment) -> TypingEnvironment{
+    type_env.into_iter().map(|(x, scheme_type)| (x.clone(), sub_scheme(subst, scheme_type))).collect()
 }
 
-fn sub_scheme(subst: &Substitution, scheme_type: TypeScheme) -> TypeScheme {
+fn sub_scheme(subst: &Substitution, scheme_type: &TypeScheme) -> TypeScheme {
     let (scheme_vars, t) = scheme_type;
     let new_scheme = sub_type(&subst.exclude(&scheme_vars), &t);
-    (scheme_vars, new_scheme)
+    (scheme_vars.to_vec(), new_scheme)
 }
 
 fn sub_type(subst: &Substitution, t: &Type) -> Type {

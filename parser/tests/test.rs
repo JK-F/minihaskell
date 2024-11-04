@@ -40,6 +40,8 @@ test_parse! {
     list: "files/list.hs",
     append: "files/append.hs",
     ranges: "files/ranges.hs",
+    letin: "files/let.hs",
+    lambda: "files/lambda.hs",
 }
 
 #[test]

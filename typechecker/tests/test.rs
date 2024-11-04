@@ -22,4 +22,7 @@ test_typecheck! {
     basic_types: "files/basic_types.hs",
     list_types: "files/list_types.hs",
     higher_order_types: "files/higher_order_types.hs",
+    id: "files/id.hs",
+    letin: "files/let.hs",
+    lambda: "files/lambda.hs",
 }

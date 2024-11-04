@@ -87,23 +87,35 @@ fn parse_decl(decl: Pair<Rule>) -> Result<Decl, ParsingError> {
                 }
             };
         }
-        Rule::infixop
+        Rule::paren_expr
+        | Rule::expr
+        | Rule::io_expr
+        | Rule::aexpr
+        | Rule::application
         | Rule::number
         | Rule::char
         | Rule::bool
         | Rule::string
-        | Rule::aexpr
-        | Rule::application
-        | Rule::paren_expr
+        | Rule::type_name
+        | Rule::reserved
         | Rule::tuple_expr
-        | Rule::list_expr
         | Rule::cond
-        | Rule::var_name => {
+        | Rule::let_in
+        | Rule::lambda
+        | Rule::literal
+        | Rule::var_name
+        | Rule::list_expr
+        | Rule::empty_list
+        | Rule::open_range
+        | Rule::open_step_range
+        | Rule::closed_range
+        | Rule::closed_step_range
+        | Rule::infixop => {
             let expr = parse_expr(decl)?;
             Ok(Decl::SExpr(expr))
         }
         Rule::EOI => Ok(Decl::EndOfInstruction),
-        _ => Err(GrammarError),
+        _ => Err(GrammarError)
     };
     info!("Returning {:?}", &res);
     res
@@ -121,8 +133,11 @@ fn parse_expr(expr: Pair<Rule>) -> Result<Expr, ParsingError> {
         }
         Rule::application => {
             let inner = expr.into_inner();
-            let exprs = inner.map(|p| parse_expr(p)).collect::<Result<Vec<Expr>, _>>()?;
-            exprs.into_iter()
+            let exprs = inner
+                .map(|p| parse_expr(p))
+                .collect::<Result<Vec<Expr>, _>>()?;
+            exprs
+                .into_iter()
                 .reduce(|acc, arg| Expr::Application(Box::new(acc), Box::new(arg)))
                 .ok_or(GrammarError)
             // f x y
@@ -162,26 +177,42 @@ fn parse_expr(expr: Pair<Rule>) -> Result<Expr, ParsingError> {
         Rule::open_range => {
             let mut inner = expr.into_inner();
             let first = parse_expr(inner.next().ok_or(GrammarError)?)?;
-            Ok(Expr::Range(Box::new(first), Box::new(Expr::Literal(Literal::Int(1))), None))
+            Ok(Expr::Range(
+                Box::new(first),
+                Box::new(Expr::Literal(Literal::Int(1))),
+                None,
+            ))
         }
         Rule::open_step_range => {
             let mut inner = expr.into_inner();
             let first = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
             let second = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
-            Ok(Expr::Range(first.clone(), Box::new(Expr::BinOp(second, Op::Sub, first)), None))
+            Ok(Expr::Range(
+                first.clone(),
+                Box::new(Expr::BinOp(second, Op::Sub, first)),
+                None,
+            ))
         }
         Rule::closed_range => {
             let mut inner = expr.into_inner();
             let first = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
             let last = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
-            Ok(Expr::Range(first.clone(), Box::new(Expr::Literal(Literal::Int(1))), Some(last)))
+            Ok(Expr::Range(
+                first.clone(),
+                Box::new(Expr::Literal(Literal::Int(1))),
+                Some(last),
+            ))
         }
         Rule::closed_step_range => {
             let mut inner = expr.into_inner();
             let first = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
             let second = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
             let last = Box::new(parse_expr(inner.next().ok_or(GrammarError)?)?);
-            Ok(Expr::Range(first.clone(), Box::new(Expr::BinOp(second, Op::Sub, first)), Some(last)))
+            Ok(Expr::Range(
+                first.clone(),
+                Box::new(Expr::BinOp(second, Op::Sub, first)),
+                Some(last),
+            ))
         }
         Rule::empty_list => Ok(Expr::List(List::Empty)),
         Rule::cond => {
@@ -191,6 +222,19 @@ fn parse_expr(expr: Pair<Rule>) -> Result<Expr, ParsingError> {
             let then_expr = Box::new(es.pop().ok_or(GrammarError)?);
             let test = Box::new(es.pop().ok_or(GrammarError)?);
             Ok(Expr::If(test, then_expr, else_expr))
+        }
+        Rule::lambda => {
+            let mut inner = expr.into_inner();
+            let var_name = parse_symname(inner.next().ok_or(GrammarError)?)?;
+            let expr = parse_expr(inner.next().ok_or(GrammarError)?)?;
+            Ok(Expr::Lambda(var_name, Box::new(expr)))
+        }
+        Rule::let_in => {
+            let mut inner = expr.into_inner();
+            let var_name = parse_symname(inner.next().ok_or(GrammarError)?)?;
+            let expr1 = parse_expr(inner.next().ok_or(GrammarError)?)?;
+            let expr2 = parse_expr(inner.next().ok_or(GrammarError)?)?;
+            Ok(Expr::Let(var_name, Box::new(expr1), Box::new(expr2)))
         }
         _ => Err(GrammarError),
     };
@@ -305,7 +349,8 @@ fn parse_type(atype: Pair<Rule>) -> Result<Type, ParsingError> {
         Rule::fun_type | Rule::paren_fun_type => {
             let inner = atype.into_inner();
             let types: Vec<Type> = inner.map(|p| parse_type(p)).collect::<Result<_, _>>()?;
-            types.into_iter()
+            types
+                .into_iter()
                 .rev()
                 .reduce(|acc, arg| Type::Function(Box::new(arg), Box::new(acc)))
                 .ok_or(GrammarError)
@@ -320,7 +365,13 @@ fn parse_type(atype: Pair<Rule>) -> Result<Type, ParsingError> {
             let es: Vec<Type> = inner.map(|p| parse_type(p)).collect::<Result<_, _>>()?;
             Ok(Type::Tuple(es))
         }
-        Rule::list_type => Ok(Type::List( Box::new(atype.into_inner().next().map(parse_type).ok_or(GrammarError)??))),
+        Rule::list_type => Ok(Type::List(Box::new(
+            atype
+                .into_inner()
+                .next()
+                .map(parse_type)
+                .ok_or(GrammarError)??,
+        ))),
         _ => Err(GrammarError),
     };
 }
@@ -345,7 +396,13 @@ fn merge_var_bindings(fun_name: String, case: (Option<Pattern>, Expr)) -> (Optio
     let (pattern, expr) = case;
     match pattern {
         Some(Pattern::FakeTuple(ps)) => {
-            info!("Merging var names on {}", ps.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(" "));
+            info!(
+                "Merging var names on {}",
+                ps.iter()
+                    .map(|p| p.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            );
             let renamings = ps
                 .iter()
                 .enumerate()
@@ -386,6 +443,24 @@ fn rename_expr(expr: Expr, old: &String, new: &String) -> Expr {
                 Expr::Var(name)
             }
         }
+        Expr::Lambda(arg, expr) => {
+            if arg.eq(old) {
+                Expr::Lambda(arg, expr)
+            } else {
+                Expr::Lambda(arg, Box::new(rename_expr(*expr, old, new)))
+            }
+        }
+        Expr::Let(arg, expr1, expr2) => {
+            if arg.eq(old) {
+                Expr::Let(arg, expr1, expr2)
+            } else {
+                Expr::Let(
+                    arg,
+                    Box::new(rename_expr(*expr1, old, new)),
+                    Box::new(rename_expr(*expr2, old, new)),
+                )
+            }
+        }
         Expr::Application(f, e) => Expr::Application(
             Box::new(rename_expr(*f, old, new)),
             Box::new(rename_expr(*e, old, new)),
@@ -393,20 +468,35 @@ fn rename_expr(expr: Expr, old: &String, new: &String) -> Expr {
         Expr::If(a, b, c) => Expr::If(
             Box::new(rename_expr(*a, old, new)),
             Box::new(rename_expr(*b, old, new)),
-             Box::new(rename_expr(*c, old, new)),
+            Box::new(rename_expr(*c, old, new)),
         ),
-        Expr::Case(e, cases) => Expr::Case(Box::new(rename_expr(*e, old, new)), cases.into_iter().map(|(p, e)| rename_case(p, e, old, new) ).collect()),
-        Expr::BinOp(l, op, r) => Expr::BinOp(Box::new(rename_expr(*l, old, new)), op, Box::new(rename_expr(*r, old, new))),
+        Expr::Case(e, cases) => Expr::Case(
+            Box::new(rename_expr(*e, old, new)),
+            cases
+                .into_iter()
+                .map(|(p, e)| rename_case(p, e, old, new))
+                .collect(),
+        ),
+        Expr::BinOp(l, op, r) => Expr::BinOp(
+            Box::new(rename_expr(*l, old, new)),
+            op,
+            Box::new(rename_expr(*r, old, new)),
+        ),
         Expr::Tuple(es) => Expr::Tuple(es.into_iter().map(|e| rename_expr(e, old, new)).collect()),
-        Expr::List(ls) =>  Expr::List(rename_list(ls, old, new)),
+        Expr::List(ls) => Expr::List(rename_list(ls, old, new)),
         Expr::Literal(l) => Expr::Literal(l),
-        Expr::Range(start, step, stop) => Expr::Range(Box::new(rename_expr(*start, old, new)), step, stop),
+        Expr::Range(start, step, stop) => {
+            Expr::Range(Box::new(rename_expr(*start, old, new)), step, stop)
+        }
     }
 }
 
 fn rename_list(ls: List<Expr>, old: &String, new: &String) -> List<Expr> {
     match ls {
-        List::Some(e, es) => List::Some(Box::new(rename_expr(*e, old, new)), Box::new(rename_list(*es, old, new))),
+        List::Some(e, es) => List::Some(
+            Box::new(rename_expr(*e, old, new)),
+            Box::new(rename_list(*es, old, new)),
+        ),
         List::Empty => List::Empty,
     }
 }
@@ -421,8 +511,8 @@ fn rename_case(p: Pattern, e: Expr, old: &String, new: &String) -> (Pattern, Exp
 fn is_bound(p: &Pattern, old: &String) -> bool {
     match p {
         Pattern::Var(name) => name.eq(old),
-        Pattern::Tuple(ps)     => ps.into_iter().any(|p| is_bound(p, old)),
-        Pattern::FakeTuple(ps)     => ps.into_iter().any(|p| is_bound(p, old)),
+        Pattern::Tuple(ps) => ps.into_iter().any(|p| is_bound(p, old)),
+        Pattern::FakeTuple(ps) => ps.into_iter().any(|p| is_bound(p, old)),
         Pattern::List(p1, p2) => is_bound(p1, old) || is_bound(p2, old),
         Pattern::Literal(_) => false,
         Pattern::Wildcard => false,

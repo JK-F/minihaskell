@@ -16,7 +16,7 @@ list_pattern  =  { pattern ~ ":" ~ (list_pattern | var_name | empty_list) }
 // Expressions:
 expr              = _{ application | io_expr }
 io_expr           = _{ infixop | aexpr }
-aexpr             = _{ paren_expr | tuple_expr | cond | literal | var_name | list_expr | empty_list | open_range | open_step_range | closed_range | closed_step_range }
+aexpr             = _{ paren_expr | tuple_expr | cond | let_in | lambda | literal | var_name | list_expr | empty_list | open_range | open_step_range | closed_range | closed_step_range }
 infixop           =  { aexpr ~ binop ~ expr }
 application       =  { io_expr ~ io_expr+ }
 paren_expr        =  { "(" ~ expr ~ ")" }
@@ -27,6 +27,8 @@ open_step_range   =  { "[" ~ number ~ "," ~ number ~ ".." ~ "]" }
 closed_range      =  { "[" ~ number ~ ".." ~ number ~ "]" }
 closed_step_range =  { "[" ~ number ~ "," ~ number ~ ".." ~ number ~ "]" }
 cond              =  { "if" ~ expr ~ "then" ~ expr ~ "else" ~ expr }
+let_in            =  { "let" ~ var_name ~ "=" ~ expr ~ "in" ~ expr }
+lambda            =  { "\\" ~ var_name ~ "->" ~ expr }
 binop             = @{ "++" | "+" | "-" | "*" | "/=" | "/" | "==" | "<" | ">" | "<=" | ">=" | "&&" | "||" | ":" | "`mod`" }
 token_type        = _{ fun_type | atype }
 atype             = _{ tuple_type | list_type | type_name | paren_type | paren_fun_type }
@@ -44,4 +46,4 @@ string  = @{ "\"" ~ (!("\"" | "\\") ~ ASCII)* ~ "\"" }
 
 type_name = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
 var_name  = @{ !reserved ~ ( "_" ~ ASCII_ALPHANUMERIC* | ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "_")*) }
-reserved  = _{ "if" | "then" | "else" | "type" }
+reserved  = _{ "if" | "then" | "else" | "type" | "let" | "in" }
