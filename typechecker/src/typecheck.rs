@@ -2,79 +2,11 @@ use std::{collections::HashMap, iter::zip};
 
 use ast::ast::{Decl, Expr, List, Literal, Op, Pattern, Program, Type};
 use log::info;
-use crate::error::TypingError;
+use crate::{error::TypingError, subst::{subst_combine, Substitution}, util::{fresh_name, tvars_in}};
 
-type TypeVariable = String;
-type TypeScheme = (Vec<TypeVariable>, Type);
-type TypingEnvironment = HashMap<TypeVariable, TypeScheme>;
-pub struct Substitution {
-    map: HashMap<TypeVariable, Type>,
+type TypeScheme = (Vec<String>, Type);
+type TypingEnvironment = HashMap<String, TypeScheme>;
 
-} 
-
-static mut LABEL_COUNTER: i32 = 0; 
-
-fn fresh_name() -> TypeVariable {
-    let res = format!("<{}>", unsafe {LABEL_COUNTER} );
-    unsafe {LABEL_COUNTER += 1;}
-    res
-}
-
-impl Substitution {
-    fn extended(self, tv: TypeVariable, t: Type) -> Result<Substitution, TypingError> {
-        info!("Extending substitution with {} -> {}", tv, t);
-        if let Type::TypeVariable(tv2) = &t {
-            if tv.eq(tv2) {
-                return Ok(self)
-            }
-        }
-        if tvars_in(&t).contains(&&tv) {
-            return Err(TypingError::DuplicateTypeVariable(tv));
-        }
-        let mut map = self.map;
-        map.insert(tv, t);
-        Ok(Substitution { map })
-    }
-    fn apply(&self, tv: &TypeVariable) -> Type {
-        match self.map.get(tv) {
-            Some(t) => t.clone(),
-            None => Type::TypeVariable(tv.clone()),
-        }
-    }
-
-    fn new() -> Substitution {
-        Substitution { map: HashMap::new() }
-    }
-
-    fn id_subst() -> Substitution {
-        Substitution::new()
-    }
-
-    fn from(map: HashMap<TypeVariable, Type>) -> Substitution {
-        Substitution { map }
-    }
-
-    fn exclude(&self, scheme_vars: &Vec<TypeVariable>) -> Substitution {
-        let mut map = self.map.clone();
-        scheme_vars.iter().for_each(|var| { map.remove(var); } );
-        Substitution::from(map)
-    }
-}
-
-fn tvars_in(t: &Type) -> Vec<&TypeVariable> {
-    match t {
-        Type::TypeVariable(tv) => vec![tv],
-        Type::Function(t1, t2) => {
-            let mut v1 = tvars_in(t1);
-            let mut v2 = tvars_in(t2);
-            v1.append(&mut v2);
-            v1
-        },
-        Type::Tuple(ts) => ts.into_iter().flat_map(tvars_in).collect(),
-        Type::List(t) => tvars_in(t),
-        Type::Int | Type::Bool | Type::Char | Type::String => vec![],
-    }
-}
 
 pub fn typecheck_program(p: &Program) -> Result<Substitution, TypingError> {
     let mut type_env = TypingEnvironment::new();
@@ -103,7 +35,7 @@ fn typecheck_decl(type_env: &mut TypingEnvironment, subst: Substitution, decl: &
             info!("Type checking {name} with arguments {}", vars.join(", "));
             if !type_env.contains_key(name) {
                 let fresh_name = fresh_name();
-                type_env.insert(name.clone(), (vec![], Type::TypeVariable(fresh_name)));
+                type_env.insert(name.clone(), (vec![fresh_name.clone()], Type::TypeVariable(fresh_name)));
             }
             let args = vars.into_iter().map(|arg| (arg, Type::TypeVariable(fresh_name())));
             for (var, fresh_type) in args.clone() {
@@ -122,14 +54,6 @@ fn typecheck_decl(type_env: &mut TypingEnvironment, subst: Substitution, decl: &
         Decl::SExpr(e) => typecheck_expression(type_env, e).map(|(subst, _)| subst),
         Decl::EndOfInstruction => Ok(Substitution::id_subst()),
     }
-}
-
-fn subst_combine(left: Substitution, right: Substitution) -> Substitution {
-    let mut map = right.map;
-    for (k, v) in left.map {
-        map.insert(k, v);
-    }
-    Substitution::from(map)
 }
 
 fn typecheck_expression(type_env: &mut TypingEnvironment, expr: &Expr) -> Result<(Substitution, Type), TypingError> {
