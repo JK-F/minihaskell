@@ -53,6 +53,8 @@ fn application_multiple_args_test() {
     let f = Box::new(Expr::Var("f".to_string()));
     let x = Box::new(Expr::Var("x".to_string()));
     let y = Box::new(Expr::Var("y".to_string()));
-    assert_eq!(appl, Decl::SExpr(Expr::Application(Box::new(Expr::Application(f, x)), y)));
-    
+    assert_eq!(
+        appl,
+        Decl::SExpr(Expr::Application(Box::new(Expr::Application(f, x)), y))
+    );
 }

@@ -9,4 +9,3 @@ macro_rules! info_parse {
         );
     };
 }
-

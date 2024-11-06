@@ -115,7 +115,7 @@ fn parse_decl(decl: Pair<Rule>) -> Result<Decl, ParsingError> {
             Ok(Decl::SExpr(expr))
         }
         Rule::EOI => Ok(Decl::EndOfInstruction),
-        _ => Err(GrammarError)
+        _ => Err(GrammarError),
     };
     info!("Returning {:?}", &res);
     res

@@ -13,7 +13,14 @@ impl Display for Type {
             Type::TypeVariable(name) => write!(f, "{}", name),
             Type::Function(left, right) => write!(f, "({} -> {})", left, right),
             Type::List(t) => write!(f, "[{}]", t),
-            Type::Tuple(vals) => write!(f, "({})", vals.into_iter().map(|val| format!("{}", val)).collect::<Vec<_>>().join(", ")),
+            Type::Tuple(vals) => write!(
+                f,
+                "({})",
+                vals.into_iter()
+                    .map(|val| format!("{}", val))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
             Type::Int => write!(f, "Int"),
             Type::Bool => write!(f, "Bool"),
             Type::Char => write!(f, "Char"),
@@ -38,7 +45,9 @@ impl Display for Decl {
         match self {
             Decl::TypeAlias(type_var, type_expr) => write!(f, "type {} = {}", type_var, type_expr),
             Decl::TypeSignature(var_name, type_expr) => write!(f, "{} :: {}", var_name, type_expr),
-            Decl::FunDecl(var_name, args, expr) => write!(f, "{} {}= {}", var_name, args.join(" ") + " ", expr),
+            Decl::FunDecl(var_name, args, expr) => {
+                write!(f, "{} {}= {}", var_name, args.join(" ") + " ", expr)
+            }
             Decl::SExpr(expr) => write!(f, "{}", expr),
             Decl::EndOfInstruction => write!(f, ""),
         }
@@ -48,12 +57,10 @@ impl Display for Decl {
 impl Display for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Expr::Var(name) => write!(f, "{}", name ),
+            Expr::Var(name) => write!(f, "{}", name),
             Expr::Application(fun, arg) => write!(f, "({} {})", fun, arg),
-            Expr::If(a, b, c) =>  write!(f, "if {}, then {}, else {}", a, b, c),
-            Expr::Tuple(es) => {
-                fmt_vec(f, es, "(", ")", ", ")
-            },
+            Expr::If(a, b, c) => write!(f, "if {}, then {}, else {}", a, b, c),
+            Expr::Tuple(es) => fmt_vec(f, es, "(", ")", ", "),
             Expr::List(ls) => write!(f, "{}", ls),
             Expr::BinOp(l, op, r) => write!(f, "({} {} {})", l, op, r),
             Expr::Literal(l) => write!(f, "{}", l),
@@ -61,36 +68,28 @@ impl Display for Expr {
                 write!(f, "match {} with {{", e)?;
                 for (p, body) in cases {
                     write!(f, "{} -> {};", p, body)?;
-
                 }
                 write!(f, "}}")
-            },
-            Expr::Range(start, step, last) => {
-                match last {
-                    Some(last) => write!(f, "[{}, ..{}.., {}] ", start, step, last),
-                    None => write!(f, "[{}, ..{}..] ", start, step),
-                }
-                
             }
+            Expr::Range(start, step, last) => match last {
+                Some(last) => write!(f, "[{}, ..{}.., {}] ", start, step, last),
+                None => write!(f, "[{}, ..{}..] ", start, step),
+            },
             Expr::Lambda(arg, expr) => write!(f, "(\\{} -> {})", arg, expr),
             Expr::Let(x, expr1, expr2) => write!(f, "let {} = {} in \n\t | {}", x, expr1, expr2),
         }
     }
 }
 
-impl Display for Pattern { 
+impl Display for Pattern {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Pattern::Literal(l) => write!(f, "{}", l),
             Pattern::Var(name) => write!(f, "{}", name),
             Pattern::EmptyList => write!(f, "[]"),
             Pattern::Wildcard => write!(f, "_"),
-            Pattern::Tuple(ps) => {
-                fmt_vec(f, ps, "(", ")", ", ")
-            }
-            Pattern::FakeTuple(ps) => {
-                fmt_vec(f, ps, "", "", " ")
-            }
+            Pattern::Tuple(ps) => fmt_vec(f, ps, "(", ")", ", "),
+            Pattern::FakeTuple(ps) => fmt_vec(f, ps, "", "", " "),
             Pattern::List(p1, p2) => write!(f, "({}:{})", p1, p2),
         }
     }
@@ -104,40 +103,44 @@ impl Display for Op {
             Op::Mul => write!(f, "*"),
             Op::Div => write!(f, "/"),
             Op::Mod => write!(f, "`mod`"),
-            Op::Eq  => write!(f, "=="),
+            Op::Eq => write!(f, "=="),
             Op::Neq => write!(f, "/="),
-            Op::Lt  => write!(f, "<"),
-            Op::Gt  => write!(f, ">"),
-            Op::Le  => write!(f, "<="),
-            Op::Ge  => write!(f, ">="),
+            Op::Lt => write!(f, "<"),
+            Op::Gt => write!(f, ">"),
+            Op::Le => write!(f, "<="),
+            Op::Ge => write!(f, ">="),
             Op::And => write!(f, "&&"),
-            Op::Or  => write!(f, "||"),
+            Op::Or => write!(f, "||"),
             Op::Append => write!(f, "++"),
             Op::Cons => write!(f, ":"),
         }
     }
 }
 
-impl <T> Display for List<T>
-    where T: Display {
-        fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-            let mut vec = vec![];
-            let mut curr = self;
-            while let List::Some(v, vs) = curr {
-                vec.push(v);
-                curr = vs;
-            }
-            let vec: Vec<String> = vec.iter().map(|v| format!("{}", v)).collect();
-            write!(f, "[{}]", vec.join(", "))
+impl<T> Display for List<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let mut vec = vec![];
+        let mut curr = self;
+        while let List::Some(v, vs) = curr {
+            vec.push(v);
+            curr = vs;
+        }
+        let vec: Vec<String> = vec.iter().map(|v| format!("{}", v)).collect();
+        write!(f, "[{}]", vec.join(", "))
     }
 }
 
-fn fmt_vec<T>(f: &mut Formatter<'_>, v: &Vec<T>, open: &str, close: &str, join: &str) -> Result 
-    where T: Display {
+fn fmt_vec<T>(f: &mut Formatter<'_>, v: &Vec<T>, open: &str, close: &str, join: &str) -> Result
+where
+    T: Display,
+{
     match &v[..] {
         [] => {
             write!(f, "{}{}", open, close)
-        },
+        }
         [xs @ .., last] => {
             write!(f, "{}", open)?;
             for x in xs {
