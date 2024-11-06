@@ -13,6 +13,7 @@ empty_list    =  { "[]" }
 wildcard      =  { "_" }
 tuple_pattern =  { "(" ~ pattern ~ ("," ~ pattern)+ ~ ")" }
 list_pattern  =  { pattern ~ ":" ~ (list_pattern | var_name | empty_list) }
+
 // Expressions:
 expr              = _{ application | io_expr }
 io_expr           = _{ infixop | aexpr }
@@ -30,19 +31,22 @@ cond              =  { "if" ~ expr ~ "then" ~ expr ~ "else" ~ expr }
 let_in            =  { "let" ~ var_name ~ "=" ~ expr ~ "in" ~ expr }
 lambda            =  { "\\" ~ var_name ~ "->" ~ expr }
 binop             = @{ "++" | "+" | "-" | "*" | "/=" | "/" | "==" | "<" | ">" | "<=" | ">=" | "&&" | "||" | ":" | "`mod`" }
-token_type        = _{ fun_type | atype }
-atype             = _{ tuple_type | list_type | type_name | paren_type | paren_fun_type }
-fun_type          =  { atype ~ ("->" ~ atype)+ }
-paren_fun_type    =  { "(" ~ fun_type ~ ")" }
-paren_type        =  { "(" ~ atype ~ ")" }
-tuple_type        =  { "(" ~ token_type ~ ("," ~ token_type)+ ~ ")" }
-list_type         =  { "[" ~ token_type ~ "]" }
+
 // Literals
 literal = _{ number | char | bool | string }
 number  = @{ ASCII_DIGIT+ }
 char    = @{ "'" ~ !("'" | "\\") ~ ANY ~ "'" }
 bool    = @{ "True" | "False" }
 string  = @{ "\"" ~ (!("\"" | "\\") ~ ASCII)* ~ "\"" }
+
+// Types:
+token_type        = _{ fun_type | atype }
+atype             = _{ tuple_type | list_type | type_name | var_name | paren_type | paren_fun_type }
+fun_type          =  { atype ~ ("->" ~ atype)+ }
+paren_fun_type    =  { "(" ~ fun_type ~ ")" }
+paren_type        =  { "(" ~ atype ~ ")" }
+tuple_type        =  { "(" ~ token_type ~ ("," ~ token_type)+ ~ ")" }
+list_type         =  { "[" ~ token_type ~ "]" }
 
 type_name = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
 var_name  = @{ !reserved ~ ( "_" ~ ASCII_ALPHANUMERIC* | ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "_")*) }

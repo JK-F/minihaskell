@@ -336,6 +336,7 @@ fn parse_literal(literal: Pair<Rule>) -> Result<Literal, ParsingError> {
 fn parse_type(atype: Pair<Rule>) -> Result<Type, ParsingError> {
     info_parse!("Type", atype);
     return match atype.as_rule() {
+        Rule::var_name => parse_symname(atype).map(|name| Type::TypeVariable(name)),
         Rule::type_name => {
             let name = parse_symname(atype)?;
             Ok(match name.as_str() {
