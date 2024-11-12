@@ -166,7 +166,11 @@ fn typecheck_expression(
             let (right_subst, right_type) = typecheck_expression(type_env, right)?;
             let subst = subst_combine(left_subst, right_subst);
             match op {
-                Op::Add | Op::Sub | Op::Mul | Op::Mod | Op::Div => Ok((subst, Type::Int)),
+                Op::Add | Op::Sub | Op::Mul | Op::Mod | Op::Div => {
+                    let subst = unify(subst, &left_type, &Type::Int)?;
+                    let subst = unify(subst, &right_type, &Type::Int)?;
+                    Ok((subst, Type::Int))
+                },
                 Op::Eq | Op::Neq => Ok((subst, Type::Bool)),
                 Op::Lt | Op::Gt | Op::Le | Op::Ge => {
                     let subst = unify(subst, &left_type, &Type::Int)?;
