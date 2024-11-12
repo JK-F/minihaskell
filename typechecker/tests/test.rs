@@ -1,5 +1,5 @@
-use typechecker::typecheck;
 use log::info;
+use typechecker::typecheck;
 
 macro_rules! test_typecheck {
     ($($name:ident: $file:expr,)*) => {

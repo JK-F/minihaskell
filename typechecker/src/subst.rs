@@ -7,15 +7,14 @@ use crate::{error::TypingError, util::tvars_in};
 
 pub struct Substitution {
     map: HashMap<String, Type>,
-
-} 
+}
 
 impl Substitution {
     pub fn extended(self, tv: String, t: Type) -> Result<Substitution, TypingError> {
         info!("Extending substitution with {} -> {}", tv, t);
         if let Type::TypeVariable(tv2) = &t {
             if tv.eq(tv2) {
-                return Ok(self)
+                return Ok(self);
             }
         }
         if tvars_in(&t).contains(&&tv) {
@@ -33,7 +32,9 @@ impl Substitution {
     }
 
     fn new() -> Substitution {
-        Substitution { map: HashMap::new() }
+        Substitution {
+            map: HashMap::new(),
+        }
     }
 
     pub fn id_subst() -> Substitution {
@@ -46,7 +47,9 @@ impl Substitution {
 
     pub fn exclude(&self, scheme_vars: &Vec<String>) -> Substitution {
         let mut map = self.map.clone();
-        scheme_vars.iter().for_each(|var| { map.remove(var); } );
+        scheme_vars.iter().for_each(|var| {
+            map.remove(var);
+        });
         Substitution::from(map)
     }
 }
