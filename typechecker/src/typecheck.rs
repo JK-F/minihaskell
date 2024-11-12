@@ -3,7 +3,10 @@ use std::{collections::HashMap, iter::zip};
 use crate::{
     error::TypingError,
     subst::{subst_combine, Substitution},
-    util::{fresh_name, renamed_scheme_vars, scvs_given_te, scvs_in_type_signature, sub_type, sub_type_env},
+    util::{
+        fresh_name, renamed_scheme_vars, scvs_given_te, scvs_in_type_signature, sub_type,
+        sub_type_env,
+    },
 };
 use ast::ast::{Decl, Expr, List, Literal, Op, Pattern, Program, Type};
 use log::info;
@@ -36,8 +39,14 @@ fn typecheck_decl(
             if let Some((scvs2, type2)) =
                 type_env.insert(var_name.clone(), (schematic_vars.clone(), type1.clone()))
             {
-                let map1 = schematic_vars.into_iter().map(|name| (name, Type::TypeVariable(fresh_name()))).collect::<HashMap<String, Type>>();
-                let map2 = scvs2.into_iter().map(|name| (name, Type::TypeVariable(fresh_name()))).collect::<HashMap<String, Type>>();
+                let map1 = schematic_vars
+                    .into_iter()
+                    .map(|name| (name, Type::TypeVariable(fresh_name())))
+                    .collect::<HashMap<String, Type>>();
+                let map2 = scvs2
+                    .into_iter()
+                    .map(|name| (name, Type::TypeVariable(fresh_name())))
+                    .collect::<HashMap<String, Type>>();
                 let subst1 = Substitution::from(map1);
                 let subst2 = Substitution::from(map2);
                 return unify(subst, &sub_type(&subst1, type1), &sub_type(&subst2, &type2));
@@ -53,8 +62,15 @@ fn typecheck_decl(
                     (vec![fresh_name.clone()], Type::TypeVariable(fresh_name)),
                 );
             }
-            let args = vars.into_iter().map(|arg| (arg, fresh_name())).collect::<Vec<_>>();
-            let scvs = args.clone().into_iter().map(|(_, scv)| scv).collect::<Vec<_>>();
+            let args = vars
+                .into_iter()
+                .map(|arg| (arg, fresh_name()))
+                .collect::<Vec<_>>();
+            let scvs = args
+                .clone()
+                .into_iter()
+                .map(|(_, scv)| scv)
+                .collect::<Vec<_>>();
             for (var, fresh) in args.clone() {
                 type_env.insert(
                     var.clone(),
@@ -135,9 +151,16 @@ fn typecheck_expression(
         }
         Expr::Let(var, expr1, expr2) => {
             let (subst, var_type) = typecheck_expression(type_env, &expr1)?;
-            let map = scvs_given_te(&var_type, &type_env).into_iter().map(|scheme_var| (scheme_var, fresh_name())).collect::<HashMap<_, _>>();
+            let map = scvs_given_te(&var_type, &type_env)
+                .into_iter()
+                .map(|scheme_var| (scheme_var, fresh_name()))
+                .collect::<HashMap<_, _>>();
             let scheme_vars = map.iter().map(|(_, n)| n.clone()).collect::<Vec<_>>();
-            let scheme_subst = Substitution::from(map.into_iter().map(|(old, new)| (old, Type::TypeVariable(new))).collect());
+            let scheme_subst = Substitution::from(
+                map.into_iter()
+                    .map(|(old, new)| (old, Type::TypeVariable(new)))
+                    .collect(),
+            );
             let mut type_env = sub_type_env(&subst, type_env);
             let new_type = sub_type(&scheme_subst, &var_type);
             let _ = type_env.insert(var.clone(), (scheme_vars, new_type));
@@ -170,7 +193,7 @@ fn typecheck_expression(
                     let subst = unify(subst, &left_type, &Type::Int)?;
                     let subst = unify(subst, &right_type, &Type::Int)?;
                     Ok((subst, Type::Int))
-                },
+                }
                 Op::Eq | Op::Neq => Ok((subst, Type::Bool)),
                 Op::Lt | Op::Gt | Op::Le | Op::Ge => {
                     let subst = unify(subst, &left_type, &Type::Int)?;
@@ -195,21 +218,21 @@ fn typecheck_expression(
             }
         }
         Expr::Tuple(exprs) => {
-                let mut substs = vec![];
-                let mut types = vec![];
-                for expr in exprs {
-                    let mut env = renamed_scheme_vars(type_env);
-                    let (subst, t) = typecheck_expression(&mut env, expr)?;
-                    substs.push(subst);
-                    types.push(t);
-                }
-                let subst = substs
-                    .into_iter()
-                    .rev()
-                    .reduce(|acc, sub| subst_combine(acc, sub))
-                    .unwrap_or(Substitution::id_subst());
-                Ok((subst, Type::Tuple(types)))
-        },
+            let mut substs = vec![];
+            let mut types = vec![];
+            for expr in exprs {
+                let mut env = renamed_scheme_vars(type_env);
+                let (subst, t) = typecheck_expression(&mut env, expr)?;
+                substs.push(subst);
+                types.push(t);
+            }
+            let subst = substs
+                .into_iter()
+                .rev()
+                .reduce(|acc, sub| subst_combine(acc, sub))
+                .unwrap_or(Substitution::id_subst());
+            Ok((subst, Type::Tuple(types)))
+        }
         Expr::List(es) => match es {
             List::Some(first, tail) => {
                 let (subst_first, type_first) = typecheck_expression(type_env, first)?;

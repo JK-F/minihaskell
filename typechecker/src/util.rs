@@ -1,8 +1,8 @@
 use ast::ast::Type;
 
 use crate::subst::Substitution;
-use crate::typecheck::TypingEnvironment;
 use crate::typecheck::TypeScheme;
+use crate::typecheck::TypingEnvironment;
 
 static mut LABEL_COUNTER: i32 = 0;
 
@@ -25,17 +25,27 @@ pub fn scvs_in_type_signature(t: &Type) -> Vec<String> {
 pub fn scvs_given_te(t: &Type, type_env: &TypingEnvironment) -> Vec<String> {
     let unknowns = unknowns_te(type_env);
     let tvars = tvars_in(t);
-    tvars.into_iter().filter(|tvar| unknowns.contains(tvar)).cloned().collect()
+    tvars
+        .into_iter()
+        .filter(|tvar| unknowns.contains(tvar))
+        .cloned()
+        .collect()
 }
 
 fn unknowns_te(type_env: &TypingEnvironment) -> Vec<&String> {
-    type_env.into_iter().flat_map(|(_, scheme)| unknowns_scheme(scheme)).collect()
+    type_env
+        .into_iter()
+        .flat_map(|(_, scheme)| unknowns_scheme(scheme))
+        .collect()
 }
 
 fn unknowns_scheme(scheme: &TypeScheme) -> Vec<&String> {
     let (scvs, typ) = scheme;
     let tvars = tvars_in(typ);
-    tvars.into_iter().filter(|tvar| !scvs.contains(tvar)).collect()
+    tvars
+        .into_iter()
+        .filter(|tvar| !scvs.contains(tvar))
+        .collect()
 }
 
 pub fn tvars_in(t: &Type) -> Vec<&String> {
@@ -86,10 +96,18 @@ pub fn sub_type(subst: &Substitution, t: &Type) -> Type {
 }
 
 pub fn renamed_scheme_vars(type_env: &TypingEnvironment) -> TypingEnvironment {
-    type_env.into_iter().map(|(x, (scvs, typ))|{
-        let scvs_map = scvs.into_iter().map(|scv| (scv.to_string(), fresh_name()));
-        let subst = Substitution::from(scvs_map.clone().map(|(fst, snd)| (fst, Type::TypeVariable(snd))).collect());
-        let new_scvs: Vec<String> = scvs_map.map(|(_, snd)| snd).collect();
-        (x.clone(), (new_scvs, sub_type(&subst, typ)) )
-    }).collect()
+    type_env
+        .into_iter()
+        .map(|(x, (scvs, typ))| {
+            let scvs_map = scvs.into_iter().map(|scv| (scv.to_string(), fresh_name()));
+            let subst = Substitution::from(
+                scvs_map
+                    .clone()
+                    .map(|(fst, snd)| (fst, Type::TypeVariable(snd)))
+                    .collect(),
+            );
+            let new_scvs: Vec<String> = scvs_map.map(|(_, snd)| snd).collect();
+            (x.clone(), (new_scvs, sub_type(&subst, typ)))
+        })
+        .collect()
 }

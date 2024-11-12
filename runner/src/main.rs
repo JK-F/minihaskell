@@ -1,9 +1,8 @@
 use std::{env, process::exit};
 
 use eval::eval;
-use typechecker::typecheck;
 use parser::parse;
-
+use typechecker::typecheck;
 
 fn main() {
     env_logger::init();
@@ -19,12 +18,12 @@ fn main() {
                 Err(err) => {
                     eprintln!("Ran into error while trying to open the file.");
                     eprintln!("{}", err);
-                },
+                }
             }
         }
         None => {
             println!("Please provide the path to a file.");
             exit(1);
-        },
+        }
     };
 }
