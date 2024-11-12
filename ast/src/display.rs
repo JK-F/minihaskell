@@ -34,8 +34,8 @@ impl Display for Literal {
         match self {
             Literal::Int(val) => write!(f, "{}", val),
             Literal::Bool(val) => write!(f, "{}", val),
-            Literal::String(val) => write!(f, "{}", val),
-            Literal::Char(val) => write!(f, "{}", val),
+            Literal::String(val) => write!(f, "\"{}\"", val),
+            Literal::Char(val) => write!(f, "'{}'", val),
         }
     }
 }
