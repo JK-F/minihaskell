@@ -33,7 +33,7 @@ impl Display for Literal {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Literal::Int(val) => write!(f, "{}", val),
-            Literal::Bool(val) => write!(f, "{}", val),
+            Literal::Bool(val) => write!(f, "{}", if *val {"True"} else {"False"}),
             Literal::String(val) => write!(f, "\"{}\"", val),
             Literal::Char(val) => write!(f, "'{}'", val),
         }
