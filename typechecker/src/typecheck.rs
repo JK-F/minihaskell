@@ -1,17 +1,17 @@
-use std::{collections::HashMap, iter::zip};
+use std::{
+    collections::{HashMap, HashSet},
+    iter::zip,
+};
 
 use crate::{
     error::TypingError,
     subst::{subst_combine, Substitution},
-    util::{
-        fresh_name, renamed_scheme_vars, scvs_given_te, scvs_in_type_signature, sub_type,
-        sub_type_env,
-    },
+    util::{fresh_name, scvs_given_te, scvs_in_type_signature, sub_type, sub_type_env},
 };
 use ast::ast::{Decl, Expr, List, Literal, Op, Pattern, Program, Type};
 use log::info;
 
-pub type TypeScheme = (Vec<String>, Type);
+pub type TypeScheme = (HashSet<String>, Type);
 pub type TypingEnvironment = HashMap<String, TypeScheme>;
 
 pub fn typecheck_program(p: &Program) -> Result<Substitution, TypingError> {
@@ -55,40 +55,34 @@ fn typecheck_decl(
         }
         Decl::FunDecl(name, vars, expr) => {
             info!("Type checking {name} with arguments {}", vars.join(", "));
-            if !type_env.contains_key(name) {
-                let fresh_name = fresh_name();
-                type_env.insert(
-                    name.clone(),
-                    (vec![fresh_name.clone()], Type::TypeVariable(fresh_name)),
-                );
+            let mut expr_env = type_env.clone();
+            if !expr_env.contains_key(name) {
+                let fresh = fresh_name();
+                expr_env.insert(name.clone(), (HashSet::new(), Type::TypeVariable(fresh)));
             }
-            let args = vars
+            let arg_renamings = vars
                 .into_iter()
                 .map(|arg| (arg, fresh_name()))
                 .collect::<Vec<_>>();
-            let scvs = args
-                .clone()
-                .into_iter()
-                .map(|(_, scv)| scv)
-                .collect::<Vec<_>>();
-            for (var, fresh) in args.clone() {
-                type_env.insert(
-                    var.clone(),
-                    (vec![fresh.clone()], Type::TypeVariable(fresh)),
-                );
+            for (var, fresh) in arg_renamings.clone() {
+                expr_env.insert(var.clone(), (HashSet::new(), Type::TypeVariable(fresh)));
             }
-            let (return_subst, return_type) = typecheck_expression(type_env, expr)?;
+            let (return_subst, return_type) = typecheck_expression(&mut expr_env, expr)?;
             let subst = subst_combine(subst, return_subst);
-            let fun_type = args.into_iter().map(|(_, arg_type)| arg_type).fold(
-                return_type,
-                |acc, arg_type| {
+            let fun_type = arg_renamings
+                .into_iter()
+                .map(|(_, arg_type)| arg_type)
+                .fold(return_type, |acc, arg_type| {
                     Type::Function(Box::new(Type::TypeVariable(arg_type)), Box::new(acc))
-                },
+                });
+            let fun_type = sub_type(&subst, &fun_type);
+            let scvs = scvs_given_te(&fun_type, &type_env);
+            info!(
+                "Resulting in fun_type [{}], {}",
+                scvs.iter().cloned().collect::<Vec<_>>().join(", "),
+                fun_type
             );
-            info!("Resulting in fun_type [{}], {}", scvs.join(", "), fun_type);
-            if let Some((_, type2)) = type_env.insert(name.clone(), (scvs, fun_type.clone())) {
-                return unify(subst, &fun_type, &type2);
-            }
+            let _ = type_env.insert(name.clone(), (scvs, fun_type.clone()));
             Ok(subst)
         }
         Decl::SExpr(e) => typecheck_expression(type_env, e).map(|(subst, _)| subst),
@@ -101,9 +95,10 @@ fn typecheck_expression(
     expr: &Expr,
 ) -> Result<(Substitution, Type), TypingError> {
     info!("Typechecking expr {}", expr);
+    info!("With Type Env: {:?}", type_env);
     match expr {
         Expr::Var(x) => {
-            let (scheme_vars, t) = type_env
+            let (scheme_vars, old_type) = type_env
                 .get(x)
                 .ok_or(TypingError::UnknownIdentifier(x.clone()))?;
             let map = scheme_vars
@@ -111,9 +106,10 @@ fn typecheck_expression(
                 .map(|var| (var.clone(), Type::TypeVariable(fresh_name())))
                 .collect::<HashMap<_, _>>();
             let phi = Substitution::from(map);
-            let t = sub_type(&phi, t);
+            let new_type = sub_type(&phi, old_type);
 
-            Ok((Substitution::id_subst(), t))
+            info!("Giving {x} :: {old_type} new type {new_type}");
+            Ok((Substitution::id_subst(), new_type))
         }
         Expr::Application(f, e) => {
             let (phi, type_f) = typecheck_expression(type_env, f)?;
@@ -121,7 +117,7 @@ fn typecheck_expression(
             let (psi, type_e) = typecheck_expression(&mut new_env, e)?;
             let subst = subst_combine(psi, phi);
             let tv_name = fresh_name();
-            let t = subst.apply(&tv_name);
+            let t = Type::TypeVariable(tv_name.clone());
             let subst = unify(
                 subst,
                 &type_f,
@@ -142,7 +138,10 @@ fn typecheck_expression(
         Expr::Lambda(arg, expr) => {
             let mut type_env = type_env.clone();
             let fresh = fresh_name();
-            type_env.insert(arg.clone(), (vec![], Type::TypeVariable(fresh.clone())));
+            type_env.insert(
+                arg.clone(),
+                (HashSet::new(), Type::TypeVariable(fresh.clone())),
+            );
             let (subst, ret_type) = typecheck_expression(&mut type_env, expr)?;
             Ok((
                 subst,
@@ -150,32 +149,33 @@ fn typecheck_expression(
             ))
         }
         Expr::Let(var, expr1, expr2) => {
-            let (subst, var_type) = typecheck_expression(type_env, &expr1)?;
-            let map = scvs_given_te(&var_type, &type_env)
-                .into_iter()
-                .map(|scheme_var| (scheme_var, fresh_name()))
-                .collect::<HashMap<_, _>>();
-            let scheme_vars = map.iter().map(|(_, n)| n.clone()).collect::<Vec<_>>();
-            let scheme_subst = Substitution::from(
-                map.into_iter()
-                    .map(|(old, new)| (old, Type::TypeVariable(new)))
-                    .collect(),
-            );
-            let mut type_env = sub_type_env(&subst, type_env);
-            let new_type = sub_type(&scheme_subst, &var_type);
-            let _ = type_env.insert(var.clone(), (scheme_vars, new_type));
-            typecheck_expression(&mut type_env, &expr2)
+            let mut let_env = type_env.clone();
+            let (subst1, var_type) = typecheck_expression(&mut let_env, &expr1)?;
+            info!("Resulting in {subst1:?}");
+            let mut let_env = sub_type_env(&subst1, &let_env);
+            info!("For type env {let_env:?}");
+            // add decls
+            let scvs = scvs_given_te(&var_type, &let_env);
+            let mapping = Substitution::from(scvs.into_iter().map(|scv| (scv, Type::TypeVariable(fresh_name()))).collect());
+            let new_type = sub_type(&mapping, &var_type);
+            let scheme_vars = mapping.range();
+            info!("Finding scheme vars {:?}", scheme_vars);
+            let _ = let_env.insert(var.clone(), (scheme_vars, new_type));
+            // end
+            let (subst2, return_type) = typecheck_expression(&mut let_env, &expr2)?;
+            Ok((subst_combine(subst2, subst1), return_type))
         }
         Expr::Case(case_expr, cases) => {
-            let type_env = &mut type_env.clone();
-            let (expr_subst, case_expr_type) = typecheck_expression(type_env, case_expr)?;
+            let mut type_env = type_env.clone();
+            let (expr_subst, case_expr_type) = typecheck_expression(&mut type_env, case_expr)?;
             let mut subst = expr_subst;
             // Placeholder there cant be an empty case would be stupid
             let mut return_type = None;
             for (pattern, case_body) in cases {
-                let (pattern_subst, pattern_type) = typecheck_pattern(type_env, subst, pattern)?;
+                let (pattern_subst, pattern_type) =
+                    typecheck_pattern(&mut type_env, subst, pattern)?;
                 subst = unify(pattern_subst, &case_expr_type, &pattern_type)?;
-                let (case_subst, case_body_type) = typecheck_expression(type_env, case_body)?;
+                let (case_subst, case_body_type) = typecheck_expression(&mut type_env, case_body)?;
                 subst = subst_combine(case_subst, subst);
                 if let Some(body_type) = return_type {
                     subst = unify(subst, &body_type, &case_body_type)?;
@@ -218,20 +218,17 @@ fn typecheck_expression(
             }
         }
         Expr::Tuple(exprs) => {
-            let mut substs = vec![];
+            let mut env = type_env.clone();
             let mut types = vec![];
+            let mut subst = Substitution::id_subst();
             for expr in exprs {
-                let mut env = renamed_scheme_vars(type_env);
-                let (subst, t) = typecheck_expression(&mut env, expr)?;
-                substs.push(subst);
-                types.push(t);
+                let (expr_subst, typ) = typecheck_expression(&mut env, expr)?;
+                env = sub_type_env(&expr_subst, &env);
+                subst = subst_combine(expr_subst, subst);
+                types.push(typ);
             }
-            let subst = substs
-                .into_iter()
-                .rev()
-                .reduce(|acc, sub| subst_combine(acc, sub))
-                .unwrap_or(Substitution::id_subst());
-            Ok((subst, Type::Tuple(types)))
+            let tuple_type = Type::Tuple(types.iter().map(|t| sub_type(&subst, &t)).collect());
+            Ok((subst, tuple_type))
         }
         Expr::List(es) => match es {
             List::Some(first, tail) => {
@@ -250,7 +247,6 @@ fn typecheck_expression(
         Expr::Range(from, step, to) => {
             let (subst_from, type_from) = typecheck_expression(type_env, from)?;
             let subst_from = unify(subst_from, &type_from, &Type::Int)?;
-
             let (subst_step, type_step) = typecheck_expression(type_env, step)?;
             let subst_step = unify(subst_step, &type_step, &Type::Int)?;
             let subst = subst_combine(subst_step, subst_from);
@@ -285,7 +281,7 @@ fn typecheck_pattern(
         Pattern::Var(var_name) => {
             let fresh = fresh_name();
             let type_variable = Type::TypeVariable(fresh.clone());
-            type_env.insert(var_name.clone(), (vec![fresh], type_variable.clone()));
+            type_env.insert(var_name.clone(), (HashSet::new(), type_variable.clone()));
             Ok((Substitution::id_subst(), type_variable))
         }
         Pattern::List(first, tail) => {

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use ast::ast::Type;
 
 use crate::subst::Substitution;
@@ -14,7 +16,7 @@ pub fn fresh_name() -> String {
     res
 }
 
-pub fn scvs_in_type_signature(t: &Type) -> Vec<String> {
+pub fn scvs_in_type_signature(t: &Type) -> HashSet<String> {
     tvars_in(t)
         .into_iter()
         .filter(|name| name.chars().next().unwrap().is_lowercase())
@@ -22,29 +24,29 @@ pub fn scvs_in_type_signature(t: &Type) -> Vec<String> {
         .collect()
 }
 
-pub fn scvs_given_te(t: &Type, type_env: &TypingEnvironment) -> Vec<String> {
+pub fn scvs_given_te(t: &Type, type_env: &TypingEnvironment) -> HashSet<String> {
     let unknowns = unknowns_te(type_env);
     let tvars = tvars_in(t);
     tvars
         .into_iter()
-        .filter(|tvar| unknowns.contains(tvar))
+        .filter(|tvar| !unknowns.contains(tvar))
         .cloned()
         .collect()
 }
 
-fn unknowns_te(type_env: &TypingEnvironment) -> Vec<&String> {
+fn unknowns_te(type_env: &TypingEnvironment) -> HashSet<&String> {
     type_env
         .into_iter()
         .flat_map(|(_, scheme)| unknowns_scheme(scheme))
         .collect()
 }
 
-fn unknowns_scheme(scheme: &TypeScheme) -> Vec<&String> {
+fn unknowns_scheme(scheme: &TypeScheme) -> HashSet<&String> {
     let (scvs, typ) = scheme;
     let tvars = tvars_in(typ);
     tvars
         .into_iter()
-        .filter(|tvar| !scvs.contains(tvar))
+        .filter(|tvar| !scvs.contains(*tvar))
         .collect()
 }
 
@@ -73,12 +75,26 @@ pub fn sub_type_env(subst: &Substitution, type_env: &TypingEnvironment) -> Typin
 pub fn sub_scheme(subst: &Substitution, scheme_type: &TypeScheme) -> TypeScheme {
     let (scheme_vars, t) = scheme_type;
     let new_scheme = sub_type(&subst.exclude(&scheme_vars), &t);
-    (scheme_vars.to_vec(), new_scheme)
+    (scheme_vars.clone(), new_scheme)
 }
 
 pub fn sub_type(subst: &Substitution, t: &Type) -> Type {
     match t {
-        Type::TypeVariable(tv_name) => subst.apply(tv_name),
+        Type::TypeVariable(tv_name) => {
+            match subst.apply(tv_name) {
+                Type::TypeVariable(new_tv_name) => {
+                    if new_tv_name.eq(tv_name) {
+                        return Type::TypeVariable(new_tv_name);
+                    }
+                    sub_type(subst, &Type::TypeVariable(new_tv_name))
+                },
+                Type::Int => Type::Int,
+                Type::Bool => Type::Bool,
+                Type::Char => Type::Char,
+                Type::String => Type::String,
+                new_t => sub_type(subst, &new_t),
+            }
+        },
         Type::Function(t1, t2) => {
             Type::Function(Box::new(sub_type(subst, t1)), Box::new(sub_type(subst, t2)))
         }
@@ -93,21 +109,4 @@ pub fn sub_type(subst: &Substitution, t: &Type) -> Type {
         Type::String => Type::String,
         Type::List(t) => Type::List(Box::new(sub_type(subst, t))),
     }
-}
-
-pub fn renamed_scheme_vars(type_env: &TypingEnvironment) -> TypingEnvironment {
-    type_env
-        .into_iter()
-        .map(|(x, (scvs, typ))| {
-            let scvs_map = scvs.into_iter().map(|scv| (scv.to_string(), fresh_name()));
-            let subst = Substitution::from(
-                scvs_map
-                    .clone()
-                    .map(|(fst, snd)| (fst, Type::TypeVariable(snd)))
-                    .collect(),
-            );
-            let new_scvs: Vec<String> = scvs_map.map(|(_, snd)| snd).collect();
-            (x.clone(), (new_scvs, sub_type(&subst, typ)))
-        })
-        .collect()
 }
