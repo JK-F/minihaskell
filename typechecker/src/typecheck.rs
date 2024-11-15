@@ -82,7 +82,11 @@ fn typecheck_decl(
                 scvs.iter().cloned().collect::<Vec<_>>().join(", "),
                 fun_type
             );
-            let _ = type_env.insert(name.clone(), (scvs, fun_type.clone()));
+            if let Some((_, saved_type)) = type_env.get(name) {
+                return unify(subst, &saved_type, &fun_type);
+            } else {
+                type_env.insert(name.to_string(), (scvs, fun_type));
+            }
             Ok(subst)
         }
         Decl::SExpr(e) => typecheck_expression(type_env, e).map(|(subst, _)| subst),
