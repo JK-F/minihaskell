@@ -49,5 +49,5 @@ tuple_type        =  { "(" ~ token_type ~ ("," ~ token_type)+ ~ ")" }
 list_type         =  { "[" ~ token_type ~ "]" }
 
 type_name = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
-var_name  = @{ !reserved ~ ( "_" ~ ASCII_ALPHANUMERIC* | ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "_")*) }
+var_name  = @{ !reserved ~ ( "_" ~ ASCII_ALPHANUMERIC* | ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "_")*) | reserved ~ ("_" | ASCII_ALPHANUMERIC)+ }
 reserved  = _{ "if" | "then" | "else" | "type" | "let" | "in" }
