@@ -30,7 +30,7 @@ closed_step_range =  { "[" ~ number ~ "," ~ number ~ ".." ~ number ~ "]" }
 cond              =  { "if" ~ expr ~ "then" ~ expr ~ "else" ~ expr }
 let_in            =  { "let" ~ var_name ~ "=" ~ expr ~ "in" ~ expr }
 lambda            =  { "\\" ~ var_name ~ "->" ~ expr }
-binop             = @{ "++" | "+" | "-" | "*" | "/=" | "/" | "==" | "<" | ">" | "<=" | ">=" | "&&" | "||" | ":" | "`mod`" }
+binop             = @{ "++" | "*" | "/=" | "/" | "+" | "-" | "&&" | "||" | ":" | "`mod`"  | "==" | "<" | ">" | "<=" | ">=" }
 
 // Literals
 literal = _{ number | char | bool | string }
