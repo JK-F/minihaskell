@@ -76,7 +76,7 @@ impl Display for Expr {
                 None => write!(f, "[{}, ..{}..] ", start, step),
             },
             Expr::Lambda(arg, expr) => write!(f, "(\\{} -> {})", arg, expr),
-            Expr::Let(x, expr1, expr2) => write!(f, "let {} = {} in \n\t | {}", x, expr1, expr2),
+            Expr::Let(x, expr1, expr2) => write!(f, "let {} = {} in {}", x, expr1, expr2),
         }
     }
 }
