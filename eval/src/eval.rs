@@ -63,7 +63,7 @@ fn force_eval(v: Value) -> RTResult<Value> {
 
 fn eval_expr(env: &mut Env, expr: Expr) -> RTResult<Value> {
     info!("Interpreting Expression {} with env:", expr);
-    env.debug();
+    info!("{env:?}");
     match expr {
         Expr::Var(name) => {
             let v = env.get(&name)?;

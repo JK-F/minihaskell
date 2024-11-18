@@ -3,8 +3,6 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use log::info;
-
 use crate::error::RunTimeError;
 use crate::value::Value;
 
@@ -23,16 +21,6 @@ impl Env {
             env: HashMap::new(),
         }
     }
-
-    pub fn debug(&self) {
-        for (n, v) in (*self.functions).borrow().iter() {
-            info!("{}: {}", n, v);
-        }
-        for (n, v) in self.env.iter() {
-            info!("{}: {}", n, v);
-        }
-    }
-
     pub fn add_function(&mut self, name: String, v: Value) {
         (*self.functions).borrow_mut().insert(name, v);
     }
