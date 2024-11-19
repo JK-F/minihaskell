@@ -65,9 +65,9 @@ impl Display for Expr {
             Expr::BinOp(l, op, r) => write!(f, "({} {} {})", l, op, r),
             Expr::Literal(l) => write!(f, "{}", l),
             Expr::Case(e, cases) => {
-                write!(f, "match {} with {{", e)?;
+                write!(f, "case {} of {{", e)?;
                 for (p, body) in cases {
-                    write!(f, "{} -> {};", p, body)?;
+                    write!(f, "{} -> {}; ", p, body)?;
                 }
                 write!(f, "}}")
             }

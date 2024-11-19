@@ -198,7 +198,10 @@ fn typecheck_expression(
                     let subst = unify(subst, &right_type, &Type::Int)?;
                     Ok((subst, Type::Int))
                 }
-                Op::Eq | Op::Neq => Ok((subst, Type::Bool)),
+                Op::Eq | Op::Neq => {
+                    let subst = unify(subst, &left_type, &right_type)?;
+                    Ok((subst, Type::Bool))
+                },
                 Op::Lt | Op::Gt | Op::Le | Op::Ge => {
                     let subst = unify(subst, &left_type, &Type::Int)?;
                     let subst = unify(subst, &left_type, &right_type)?;

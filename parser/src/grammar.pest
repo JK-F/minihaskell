@@ -7,6 +7,8 @@ decl          = _{ type_alias | fun_decl | type_decl | expr | "" }
 type_alias    =  { "type" ~ type_name ~ "=" ~ token_type }
 type_decl     =  { var_name ~ "::" ~ token_type }
 fun_decl      =  { PUSH(var_name) ~ patterns ~ "=" ~ expr ~ (newline ~ PEEK ~ patterns ~ "=" ~ expr)* }
+
+// Patterns
 patterns      =  { pattern* }
 pattern       = _{ var_name | literal | tuple_pattern | "(" ~ list_pattern ~ ")" | empty_list | wildcard }
 empty_list    =  { "[]" }
@@ -22,7 +24,7 @@ infixop           =  { aexpr ~ binop ~ expr }
 application       =  { io_expr ~ io_expr+ }
 paren_expr        =  { "(" ~ expr ~ ")" }
 tuple_expr        =  { "(" ~ expr ~ ("," ~ expr)+ ~ ")" }
-list_expr         =  { "[" ~ expr ~ ("," ~ expr)+ ~ "]" }
+list_expr         =  { "[" ~ expr ~ ("," ~ expr)* ~ "]" }
 open_range        =  { "[" ~ number ~ ".." ~ "]" }
 open_step_range   =  { "[" ~ number ~ "," ~ number ~ ".." ~ "]" }
 closed_range      =  { "[" ~ number ~ ".." ~ number ~ "]" }
